@@ -314,8 +314,6 @@ style()
 
 ## Tables
 
-![Table](assets/table.png)
-
 ```elixir
 alias Esc.Table
 
@@ -329,16 +327,7 @@ Table.new()
 |> Table.render()
 ```
 
-Output:
-```
-╭──────────┬────────────┬───────╮
-│ Name     │ Language   │ Stars │
-│──────────┼────────────┼───────│
-│ Lipgloss │ Go         │ 8.2k  │
-│ Esc      │ Elixir     │ New!  │
-│ Chalk    │ JavaScript │ 21k   │
-╰──────────┴────────────┴───────╯
-```
+![Table](assets/table.png)
 
 ### Table Options
 
@@ -387,8 +376,6 @@ L.enumerator(fn idx -> "[#{idx + 1}] " end)
 
 ### Nested Lists
 
-![Nested List](assets/nested_list.png)
-
 ```elixir
 nested = L.new(["Sub A", "Sub B"]) |> L.enumerator(:dash)
 
@@ -397,17 +384,9 @@ L.new(["Parent 1", nested, "Parent 2"])
 |> L.render()
 ```
 
-Output:
-```
-• Parent 1
-  - Sub A
-  - Sub B
-• Parent 2
-```
+![Nested List](assets/nested_list.png)
 
 ## Trees
-
-![Tree](assets/tree.png)
 
 ```elixir
 alias Esc.Tree
@@ -425,15 +404,7 @@ Tree.root("~/Projects")
 |> Tree.render()
 ```
 
-Output:
-```
-~/Projects
-├── esc
-│   ├── lib
-│   ├── test
-│   ╰── mix.exs
-╰── other-project
-```
+![Tree](assets/tree.png)
 
 ### Tree Options
 

@@ -6,6 +6,8 @@ Declarative terminal styling for Elixir, inspired by [Lipgloss](https://github.c
 
 Esc provides an expressive, composable API for styling terminal output with colors, borders, padding, margins, and alignment. It also includes components for tables, lists, and trees.
 
+![Text on Background](assets/Text_on_Background.png)
+
 ```elixir
 import Esc
 
@@ -143,6 +145,8 @@ style()
 
 ## Borders
 
+![Border Styles](assets/border_styles.png)
+
 ```elixir
 # Available styles: :normal, :rounded, :thick, :double, :ascii, :markdown, :hidden
 style() |> border(:rounded) |> render("Rounded box")
@@ -193,6 +197,8 @@ style() |> margin(1, 2) |> render("Margined")
 
 ### Dimensions and Alignment
 
+![Centered Text](assets/centered_text.png)
+
 ```elixir
 # Fixed width (content padded/truncated to fit)
 style() |> width(30) |> render("Fixed width")
@@ -208,6 +214,8 @@ style() |> height(5) |> vertical_align(:middle) |> render("Middle")
 ```
 
 ### Joining Blocks
+
+![Horizontal Join](assets/horizontal_join.png)
 
 ```elixir
 left = style() |> border(:rounded) |> render("Left")
@@ -306,6 +314,8 @@ style()
 
 ## Tables
 
+![Table](assets/table.png)
+
 ```elixir
 alias Esc.Table
 
@@ -377,6 +387,8 @@ L.enumerator(fn idx -> "[#{idx + 1}] " end)
 
 ### Nested Lists
 
+![Nested List](assets/nested_list.png)
+
 ```elixir
 nested = L.new(["Sub A", "Sub B"]) |> L.enumerator(:dash)
 
@@ -394,6 +406,8 @@ Output:
 ```
 
 ## Trees
+
+![Tree](assets/tree.png)
 
 ```elixir
 alias Esc.Tree

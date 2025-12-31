@@ -134,7 +134,7 @@ defmodule Esc.Table do
       |> Enum.map(fn col ->
         content_width =
           all_rows
-          |> Enum.map(fn row -> Enum.at(row, col, "") |> String.length() end)
+          |> Enum.map(fn row -> Enum.at(row, col, "") |> display_width() end)
           |> Enum.max(fn -> 0 end)
 
         min_width = Map.get(table.column_widths, col, 0)
@@ -152,32 +152,34 @@ defmodule Esc.Table do
   defp render_with_border(table, col_widths) do
     border = Border.get(table.border) || Border.get(:normal)
 
-    # Build separator line
-    separator_content = col_widths |> Enum.map(&String.duplicate(border.top, &1 + 2)) |> Enum.join(border.top)
-    top_line = border.top_left <> separator_content <> border.top_right
-    bottom_line = border.bottom_left <> String.replace(separator_content, border.top, border.bottom) <> border.bottom_right
+    # Build top line with proper intersections
+    top_segments = col_widths |> Enum.map(&String.duplicate(border.top, &1 + 2))
+    top_line = border.top_left <> Enum.join(top_segments, border.top_mid) <> border.top_right
 
-    # Header separator (between header and data)
-    header_sep = border.left <> (col_widths |> Enum.map(&String.duplicate(border.bottom, &1 + 2)) |> Enum.join(border.top)) <> border.right
+    # Build bottom line with proper intersections
+    bottom_segments = col_widths |> Enum.map(&String.duplicate(border.bottom, &1 + 2))
+    bottom_line = border.bottom_left <> Enum.join(bottom_segments, border.bottom_mid) <> border.bottom_right
 
-    lines = [top_line]
+    # Header separator (between header and data) with proper intersections
+    header_segments = col_widths |> Enum.map(&String.duplicate(border.top, &1 + 2))
+    header_sep = border.left_mid <> Enum.join(header_segments, border.cross) <> border.right_mid
 
-    # Render headers
+    # Render headers (border lines stay unstyled to avoid background bleeding)
     lines =
       if table.headers != [] do
-        header_line = render_row(table.headers, col_widths, border, table.header_style)
-        lines ++ [header_line, header_sep]
+        header_line = render_row(table.headers, col_widths, border, fn _col -> table.header_style end)
+        [top_line, header_line, header_sep]
       else
-        lines
+        [top_line]
       end
 
     # Render data rows
     data_lines =
       table.rows
       |> Enum.with_index()
-      |> Enum.map(fn {row, idx} ->
-        style = get_row_style(table, idx)
-        render_row(row, col_widths, border, style)
+      |> Enum.map(fn {row, row_idx} ->
+        style_resolver = get_style_resolver(table, row_idx)
+        render_row(row, col_widths, border, style_resolver)
       end)
 
     lines = lines ++ data_lines ++ [bottom_line]
@@ -190,7 +192,7 @@ defmodule Esc.Table do
     # Render headers
     lines =
       if table.headers != [] do
-        header_line = render_row_plain(table.headers, col_widths, table.header_style)
+        header_line = render_row_plain(table.headers, col_widths, fn _col -> table.header_style end)
         lines ++ [header_line]
       else
         lines
@@ -200,9 +202,9 @@ defmodule Esc.Table do
     data_lines =
       table.rows
       |> Enum.with_index()
-      |> Enum.map(fn {row, idx} ->
-        style = get_row_style(table, idx)
-        render_row_plain(row, col_widths, style)
+      |> Enum.map(fn {row, row_idx} ->
+        style_resolver = get_style_resolver(table, row_idx)
+        render_row_plain(row, col_widths, style_resolver)
       end)
 
     lines = lines ++ data_lines
@@ -210,33 +212,95 @@ defmodule Esc.Table do
     Enum.join(lines, "\n")
   end
 
-  defp render_row(row, col_widths, border, style) do
+  defp render_row(row, col_widths, border, style_resolver) do
     cells =
       Enum.zip(row ++ List.duplicate("", length(col_widths) - length(row)), col_widths)
       |> Enum.with_index()
-      |> Enum.map(fn {{cell, width}, _col} ->
-        padded = String.pad_trailing(cell, width)
-        styled = if style, do: Esc.render(style, padded), else: padded
-        " " <> styled <> " "
+      |> Enum.map(fn {{cell, width}, col} ->
+        style = style_resolver.(col)
+        padded = " " <> pad_trailing_display(cell, width) <> " "
+        if style, do: Esc.render(style, padded), else: padded
       end)
 
+    # Join cells with unstyled separators to match table borders
     border.left <> Enum.join(cells, border.left) <> border.right
   end
 
-  defp render_row_plain(row, col_widths, style) do
+  defp render_row_plain(row, col_widths, style_resolver) do
     Enum.zip(row ++ List.duplicate("", length(col_widths) - length(row)), col_widths)
-    |> Enum.map(fn {cell, width} ->
-      padded = String.pad_trailing(cell, width)
+    |> Enum.with_index()
+    |> Enum.map(fn {{cell, width}, col} ->
+      style = style_resolver.(col)
+      padded = pad_trailing_display(cell, width)
       if style, do: Esc.render(style, padded), else: padded
     end)
     |> Enum.join("  ")
   end
 
-  defp get_row_style(table, row_idx) do
+  # Returns a function that resolves style for a given column index
+  defp get_style_resolver(table, row_idx) do
     cond do
-      table.style_func -> table.style_func.(row_idx, 0)
-      table.row_style -> table.row_style
-      true -> nil
+      table.style_func -> fn col -> table.style_func.(row_idx, col) end
+      table.row_style -> fn _col -> table.row_style end
+      true -> fn _col -> nil end
     end
+  end
+
+  # Calculate display width accounting for wide characters (emojis, CJK, etc.)
+  defp display_width(string) do
+    string
+    |> String.graphemes()
+    |> Enum.reduce(0, fn grapheme, acc ->
+      acc + grapheme_width(grapheme)
+    end)
+  end
+
+  # Determine width of a single grapheme
+  # Wide characters (emojis, CJK) display as 2 columns in most terminals
+  defp grapheme_width(grapheme) do
+    codepoints = String.to_charlist(grapheme)
+    first_cp = List.first(codepoints)
+
+    # Check if this grapheme has emoji variation selector (FE0F) making it emoji presentation
+    has_emoji_variation = Enum.any?(codepoints, &(&1 == 0xFE0F))
+
+    cond do
+      # If only a zero-width character
+      first_cp in 0x200B..0x200D -> 0
+      first_cp in 0xFE00..0xFE0F -> 0
+      first_cp in 0x0300..0x036F -> 0
+      # Miscellaneous symbols (0x2600-0x26FF) - remain 1 wide even with FE0F
+      # These have ambiguous width and many terminals render them as 1 column
+      first_cp in 0x2600..0x26FF -> 1
+      # Emoji variation selector forces emoji presentation (2 wide) for other ranges
+      has_emoji_variation -> 2
+      # Standard emoji ranges (always 2 wide)
+      first_cp in 0x1F300..0x1F9FF -> 2
+      first_cp in 0x1F600..0x1F64F -> 2
+      first_cp in 0x1F680..0x1F6FF -> 2
+      first_cp in 0x1F1E0..0x1F1FF -> 2
+      first_cp in 0x1F400..0x1F4FF -> 2
+      first_cp in 0x1F500..0x1F5FF -> 2
+      # Dingbats with default emoji presentation (2 wide)
+      first_cp in 0x2702..0x27B0 -> 2
+      # CJK ranges
+      first_cp in 0x4E00..0x9FFF -> 2
+      first_cp in 0x3400..0x4DBF -> 2
+      first_cp in 0xF900..0xFAFF -> 2
+      first_cp in 0x3000..0x303F -> 2
+      first_cp in 0xFF00..0xFFEF -> 2
+      # Box drawing and block elements - always 1 wide
+      first_cp in 0x2500..0x257F -> 1
+      first_cp in 0x2580..0x259F -> 1
+      # Default: 1 column
+      true -> 1
+    end
+  end
+
+  # Pad string to target display width
+  defp pad_trailing_display(string, target_width) do
+    current_width = display_width(string)
+    padding_needed = max(target_width - current_width, 0)
+    string <> String.duplicate(" ", padding_needed)
   end
 end

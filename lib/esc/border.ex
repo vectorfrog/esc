@@ -11,10 +11,29 @@ defmodule Esc.Border do
           top_left: String.t(),
           top_right: String.t(),
           bottom_left: String.t(),
-          bottom_right: String.t()
+          bottom_right: String.t(),
+          top_mid: String.t(),
+          bottom_mid: String.t(),
+          left_mid: String.t(),
+          right_mid: String.t(),
+          cross: String.t()
         }
 
-  defstruct [:top, :bottom, :left, :right, :top_left, :top_right, :bottom_left, :bottom_right]
+  defstruct [
+    :top,
+    :bottom,
+    :left,
+    :right,
+    :top_left,
+    :top_right,
+    :bottom_left,
+    :bottom_right,
+    :top_mid,
+    :bottom_mid,
+    :left_mid,
+    :right_mid,
+    :cross
+  ]
 
   @doc """
   Returns a border style by name.
@@ -31,7 +50,12 @@ defmodule Esc.Border do
       top_left: "┌",
       top_right: "┐",
       bottom_left: "└",
-      bottom_right: "┘"
+      bottom_right: "┘",
+      top_mid: "┬",
+      bottom_mid: "┴",
+      left_mid: "├",
+      right_mid: "┤",
+      cross: "┼"
     }
   end
 
@@ -44,7 +68,12 @@ defmodule Esc.Border do
       top_left: "╭",
       top_right: "╮",
       bottom_left: "╰",
-      bottom_right: "╯"
+      bottom_right: "╯",
+      top_mid: "┬",
+      bottom_mid: "┴",
+      left_mid: "├",
+      right_mid: "┤",
+      cross: "┼"
     }
   end
 
@@ -57,7 +86,12 @@ defmodule Esc.Border do
       top_left: "┏",
       top_right: "┓",
       bottom_left: "┗",
-      bottom_right: "┛"
+      bottom_right: "┛",
+      top_mid: "┳",
+      bottom_mid: "┻",
+      left_mid: "┣",
+      right_mid: "┫",
+      cross: "╋"
     }
   end
 
@@ -70,7 +104,12 @@ defmodule Esc.Border do
       top_left: "╔",
       top_right: "╗",
       bottom_left: "╚",
-      bottom_right: "╝"
+      bottom_right: "╝",
+      top_mid: "╦",
+      bottom_mid: "╩",
+      left_mid: "╠",
+      right_mid: "╣",
+      cross: "╬"
     }
   end
 
@@ -83,7 +122,12 @@ defmodule Esc.Border do
       top_left: " ",
       top_right: " ",
       bottom_left: " ",
-      bottom_right: " "
+      bottom_right: " ",
+      top_mid: " ",
+      bottom_mid: " ",
+      left_mid: " ",
+      right_mid: " ",
+      cross: " "
     }
   end
 
@@ -96,7 +140,12 @@ defmodule Esc.Border do
       top_left: "|",
       top_right: "|",
       bottom_left: "|",
-      bottom_right: "|"
+      bottom_right: "|",
+      top_mid: "|",
+      bottom_mid: "|",
+      left_mid: "|",
+      right_mid: "|",
+      cross: "|"
     }
   end
 
@@ -109,7 +158,12 @@ defmodule Esc.Border do
       top_left: "+",
       top_right: "+",
       bottom_left: "+",
-      bottom_right: "+"
+      bottom_right: "+",
+      top_mid: "+",
+      bottom_mid: "+",
+      left_mid: "+",
+      right_mid: "+",
+      cross: "+"
     }
   end
 
@@ -148,7 +202,12 @@ defmodule Esc.Border do
       top_left: Keyword.get(opts, :top_left, normal.top_left),
       top_right: Keyword.get(opts, :top_right, normal.top_right),
       bottom_left: Keyword.get(opts, :bottom_left, normal.bottom_left),
-      bottom_right: Keyword.get(opts, :bottom_right, normal.bottom_right)
+      bottom_right: Keyword.get(opts, :bottom_right, normal.bottom_right),
+      top_mid: Keyword.get(opts, :top_mid, normal.top_mid),
+      bottom_mid: Keyword.get(opts, :bottom_mid, normal.bottom_mid),
+      left_mid: Keyword.get(opts, :left_mid, normal.left_mid),
+      right_mid: Keyword.get(opts, :right_mid, normal.right_mid),
+      cross: Keyword.get(opts, :cross, normal.cross)
     }
   end
 

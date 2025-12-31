@@ -1,6 +1,6 @@
 # Esc
 
-[![Elixir](https://img.shields.io/badge/elixir-1.15+-blueviolet.svg)](https://elixir-lang.org) [![Hex.pm](https://img.shields.io/hexpm/v/esc.svg)](https://hex.pm/packages/esc) [![License](https://img.shields.io/hexpm/l/esc.svg)](https://github.com/kevinkoltz/esc/blob/main/LICENSE)
+[![Elixir](https://img.shields.io/badge/elixir-1.15+-blueviolet.svg)](https://elixir-lang.org) [![Hex.pm](https://img.shields.io/hexpm/v/esc.svg)](https://hex.pm/packages/esc) [![License](https://img.shields.io/hexpm/l/esc.svg)](https://github.com/vectorfrog/esc/blob/main/LICENSE)
 
 Declarative terminal styling for Elixir, inspired by [Lipgloss](https://github.com/charmbracelet/lipgloss).
 
@@ -452,4 +452,4 @@ Application.put_env(:esc, :force_color, true)
 
 MIT License - See [LICENSE](LICENSE) file for details.
 
-Copyright (c) 2025 Kevin Koltz
+Copyright (c) 2025 Vectorfrog

@@ -2,7 +2,7 @@ defmodule Esc.MixProject do
   use Mix.Project
 
   @version "0.1.0"
-  @source_url "https://github.com/kevinkoltz/esc"
+  @source_url "https://github.com/vectorfrog/esc"
 
   def project do
     [
@@ -39,7 +39,7 @@ defmodule Esc.MixProject do
     [
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url},
-      maintainers: ["Kevin Koltz"]
+      maintainers: ["Vectorfrog"]
     ]
   end
 

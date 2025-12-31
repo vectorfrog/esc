@@ -240,4 +240,268 @@ tree
 
 IO.puts("")
 
+# 9. Dependency tree (npm/mix style)
+IO.puts("9. Dependency Tree:\n")
+
+phoenix_deps =
+  Tree.root("phoenix@1.7.10")
+  |> Tree.child("plug@1.15.2")
+  |> Tree.child("phoenix_html@3.3.3")
+
+ecto_deps =
+  Tree.root("ecto@3.11.1")
+  |> Tree.child("decimal@2.1.1")
+  |> Tree.child("jason@1.4.1")
+
+tree =
+  Tree.root("my_app@0.1.0")
+  |> Tree.child(phoenix_deps)
+  |> Tree.child(ecto_deps)
+  |> Tree.child("telemetry@1.2.1")
+  |> Tree.enumerator(:rounded)
+  |> Tree.root_style(style() |> bold() |> foreground(:green))
+  |> Tree.item_style(style() |> foreground(:cyan))
+  |> Tree.enumerator_style(style() |> faint())
+  |> Tree.render()
+
+tree
+|> String.split("\n")
+|> Enum.each(&IO.puts("   #{&1}"))
+
+IO.puts("")
+
+# 10. Process tree (pstree style)
+IO.puts("10. Process Tree:\n")
+
+bash_procs =
+  Tree.root("bash (1234)")
+  |> Tree.child("vim (1240)")
+  |> Tree.child("mix run (1245)")
+
+nginx_procs =
+  Tree.root("nginx (890)")
+  |> Tree.child("nginx worker (891)")
+  |> Tree.child("nginx worker (892)")
+  |> Tree.child("nginx worker (893)")
+
+tree =
+  Tree.root("systemd (1)")
+  |> Tree.child(bash_procs)
+  |> Tree.child(nginx_procs)
+  |> Tree.child("postgres (456)")
+  |> Tree.child("redis-server (789)")
+  |> Tree.enumerator(:rounded)
+  |> Tree.root_style(style() |> bold() |> foreground(:yellow))
+  |> Tree.item_style(style() |> foreground(:white))
+  |> Tree.enumerator_style(style() |> foreground(:blue))
+  |> Tree.render()
+
+tree
+|> String.split("\n")
+|> Enum.each(&IO.puts("   #{&1}"))
+
+IO.puts("")
+
+# 11. File browser with icons
+IO.puts("11. File Browser with Icons:\n")
+
+src_folder =
+  Tree.root("📁 src")
+  |> Tree.child("📄 main.ex")
+  |> Tree.child("📄 router.ex")
+  |> Tree.child("📄 endpoint.ex")
+
+assets_folder =
+  Tree.root("📁 assets")
+  |> Tree.child("🖼️  logo.png")
+  |> Tree.child("📄 app.css")
+  |> Tree.child("📄 app.js")
+
+tree =
+  Tree.root("📁 my_project")
+  |> Tree.child(src_folder)
+  |> Tree.child(assets_folder)
+  |> Tree.child("📄 README.md")
+  |> Tree.child("⚙️  mix.exs")
+  |> Tree.child("🔒 .env")
+  |> Tree.enumerator(:rounded)
+  |> Tree.root_style(style() |> bold())
+  |> Tree.enumerator_style(style() |> faint())
+  |> Tree.render()
+
+tree
+|> String.split("\n")
+|> Enum.each(&IO.puts("   #{&1}"))
+
+IO.puts("")
+
+# 12. Status/health tree (monitoring dashboard)
+IO.puts("12. Service Health Tree:\n")
+
+api_services =
+  Tree.root("🌐 API Gateway")
+  |> Tree.child("✅ auth-service (healthy)")
+  |> Tree.child("✅ user-service (healthy)")
+  |> Tree.child("⚠️  payment-service (degraded)")
+
+db_services =
+  Tree.root("💾 Databases")
+  |> Tree.child("✅ postgres-primary (healthy)")
+  |> Tree.child("✅ postgres-replica (healthy)")
+  |> Tree.child("❌ redis-cache (down)")
+
+tree =
+  Tree.root("🖥️  Production Cluster")
+  |> Tree.child(api_services)
+  |> Tree.child(db_services)
+  |> Tree.child("✅ nginx-lb (healthy)")
+  |> Tree.enumerator(:rounded)
+  |> Tree.root_style(style() |> bold() |> foreground(:cyan))
+  |> Tree.enumerator_style(style() |> foreground(:blue))
+  |> Tree.render()
+
+tree
+|> String.split("\n")
+|> Enum.each(&IO.puts("   #{&1}"))
+
+IO.puts("")
+
+# 13. JSON/Config structure visualization
+IO.puts("13. JSON Structure Visualization:\n")
+
+user_obj =
+  Tree.root("user: {}")
+  |> Tree.child("id: 123")
+  |> Tree.child("name: \"Alice\"")
+  |> Tree.child("email: \"alice@example.com\"")
+
+prefs_obj =
+  Tree.root("preferences: {}")
+  |> Tree.child("theme: \"dark\"")
+  |> Tree.child("notifications: true")
+
+address_obj =
+  Tree.root("address: {}")
+  |> Tree.child("city: \"Austin\"")
+  |> Tree.child("zip: \"78701\"")
+
+tree =
+  Tree.root("config.json")
+  |> Tree.child(user_obj)
+  |> Tree.child(prefs_obj)
+  |> Tree.child(address_obj)
+  |> Tree.child("version: \"1.0.0\"")
+  |> Tree.enumerator(:rounded)
+  |> Tree.root_style(style() |> bold() |> foreground(:magenta))
+  |> Tree.item_style(style() |> foreground(:yellow))
+  |> Tree.enumerator_style(style() |> faint())
+  |> Tree.render()
+
+tree
+|> String.split("\n")
+|> Enum.each(&IO.puts("   #{&1}"))
+
+IO.puts("")
+
+# 14. Git branch visualization
+IO.puts("14. Git Branch Tree:\n")
+
+feature_branches =
+  Tree.root("develop")
+  |> Tree.child("feature/auth")
+  |> Tree.child("feature/payments")
+  |> Tree.child("feature/notifications")
+
+release_branches =
+  Tree.root("release/v2.0")
+  |> Tree.child("hotfix/login-fix")
+
+tree =
+  Tree.root("main")
+  |> Tree.child(feature_branches)
+  |> Tree.child(release_branches)
+  |> Tree.child("hotfix/security-patch")
+  |> Tree.enumerator(:rounded)
+  |> Tree.root_style(style() |> bold() |> foreground(:green))
+  |> Tree.item_style(style() |> foreground(:cyan))
+  |> Tree.enumerator_style(style() |> foreground(:yellow))
+  |> Tree.render()
+
+tree
+|> String.split("\n")
+|> Enum.each(&IO.puts("   #{&1}"))
+
+IO.puts("")
+
+# 15. Organization chart
+IO.puts("15. Organization Chart:\n")
+
+engineering =
+  Tree.root("👩‍💻 VP Engineering")
+  |> Tree.child("👨‍💻 Tech Lead - Backend")
+  |> Tree.child("👩‍💻 Tech Lead - Frontend")
+  |> Tree.child("👨‍💻 Tech Lead - DevOps")
+
+product =
+  Tree.root("📊 VP Product")
+  |> Tree.child("📋 Product Manager")
+  |> Tree.child("🎨 UX Designer")
+
+tree =
+  Tree.root("🏢 CEO")
+  |> Tree.child(engineering)
+  |> Tree.child(product)
+  |> Tree.child("💰 CFO")
+  |> Tree.enumerator(:rounded)
+  |> Tree.root_style(style() |> bold() |> foreground(:yellow))
+  |> Tree.enumerator_style(style() |> foreground(:blue))
+  |> Tree.render()
+
+tree
+|> String.split("\n")
+|> Enum.each(&IO.puts("   #{&1}"))
+
+IO.puts("")
+
+# 16. Menu structure with shortcuts
+IO.puts("16. Application Menu:\n")
+
+file_menu =
+  Tree.root("File")
+  |> Tree.child("New         ⌘N")
+  |> Tree.child("Open        ⌘O")
+  |> Tree.child("Save        ⌘S")
+  |> Tree.child("Close       ⌘W")
+
+edit_menu =
+  Tree.root("Edit")
+  |> Tree.child("Undo        ⌘Z")
+  |> Tree.child("Redo        ⇧⌘Z")
+  |> Tree.child("Cut         ⌘X")
+  |> Tree.child("Copy        ⌘C")
+  |> Tree.child("Paste       ⌘V")
+
+view_menu =
+  Tree.root("View")
+  |> Tree.child("Zoom In     ⌘+")
+  |> Tree.child("Zoom Out    ⌘-")
+  |> Tree.child("Full Screen ⌃⌘F")
+
+tree =
+  Tree.root("Menu Bar")
+  |> Tree.child(file_menu)
+  |> Tree.child(edit_menu)
+  |> Tree.child(view_menu)
+  |> Tree.enumerator(:rounded)
+  |> Tree.root_style(style() |> bold() |> foreground(:white))
+  |> Tree.item_style(style() |> foreground(:cyan))
+  |> Tree.enumerator_style(style() |> faint())
+  |> Tree.render()
+
+tree
+|> String.split("\n")
+|> Enum.each(&IO.puts("   #{&1}"))
+
+IO.puts("")
+
 IO.puts("=== Demo Complete ===\n")

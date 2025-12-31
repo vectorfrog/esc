@@ -206,4 +206,231 @@ table
 
 IO.puts("")
 
+# 9. Right-aligned numeric data
+IO.puts("9. Right-Aligned Numeric Data:\n")
+
+financial_data = [
+  ["Revenue", "Q1", "$1,234,567"],
+  ["Revenue", "Q2", "$1,456,789"],
+  ["Revenue", "Q3", "$1,678,901"],
+  ["Revenue", "Q4", "$2,345,678"],
+  ["Total", "", "$6,715,935"]
+]
+
+# Right-pad category, left-pad numbers for right alignment
+financial_rows =
+  financial_data
+  |> Enum.map(fn [cat, period, amount] ->
+    [cat, period, String.pad_leading(amount, 12)]
+  end)
+
+table =
+  Table.new()
+  |> Table.headers(["Category", "Period", "Amount"])
+  |> Table.rows(financial_rows)
+  |> Table.border(:double)
+  |> Table.header_style(style() |> bold() |> foreground(:cyan))
+  |> Table.style_func(fn row, _col ->
+    if row == 4, do: style() |> bold() |> foreground(:green), else: style()
+  end)
+  |> Table.render()
+
+table
+|> String.split("\n")
+|> Enum.each(&IO.puts("   #{&1}"))
+
+IO.puts("")
+
+# 10. Unicode/Emoji content
+IO.puts("10. Unicode & Emoji Content:\n")
+
+unicode_data = [
+  ["🚀", "Deployment", "Completed"],
+  ["⚠️", "Warning", "Low disk space"],
+  ["✅", "Tests", "All passing"],
+  ["🔧", "Maintenance", "Scheduled"],
+  ["❌", "Build", "Failed"]
+]
+
+table =
+  Table.new()
+  |> Table.headers(["", "Event", "Status"])
+  |> Table.rows(unicode_data)
+  |> Table.border(:rounded)
+  |> Table.header_style(style() |> bold())
+  |> Table.render()
+
+table
+|> String.split("\n")
+|> Enum.each(&IO.puts("   #{&1}"))
+
+IO.puts("")
+
+# 11. Long content with truncation
+IO.puts("11. Long Content (manual truncation):\n")
+
+truncate = fn str, max_len ->
+  if String.length(str) > max_len do
+    String.slice(str, 0, max_len - 1) <> "…"
+  else
+    str
+  end
+end
+
+long_data = [
+  ["api-gateway", "Running for 45 days without issues", "/var/log/api.log"],
+  ["auth-service", "Restarted after memory spike detected", "/var/log/auth.log"],
+  ["data-processor", "Processing batch job #12847", "/var/log/proc.log"]
+]
+
+truncated_rows =
+  long_data
+  |> Enum.map(fn [svc, desc, log] ->
+    [truncate.(svc, 12), truncate.(desc, 25), truncate.(log, 18)]
+  end)
+
+table =
+  Table.new()
+  |> Table.headers(["Service", "Description", "Log File"])
+  |> Table.rows(truncated_rows)
+  |> Table.border(:rounded)
+  |> Table.header_style(style() |> bold() |> foreground(:white))
+  |> Table.render()
+
+table
+|> String.split("\n")
+|> Enum.each(&IO.puts("   #{&1}"))
+
+IO.puts("")
+
+# 12. Dashboard-style metrics (multiple small tables)
+IO.puts("12. Dashboard Layout (multiple tables):\n")
+
+# Helper to render table with indent
+render_with_indent = fn table_str, indent ->
+  table_str
+  |> String.split("\n")
+  |> Enum.map(&(indent <> &1))
+  |> Enum.join("\n")
+end
+
+system_table =
+  Table.new()
+  |> Table.headers(["System", "Value"])
+  |> Table.row(["CPU", "23%"])
+  |> Table.row(["Memory", "67%"])
+  |> Table.row(["Disk", "45%"])
+  |> Table.border(:rounded)
+  |> Table.header_style(style() |> bold() |> foreground(:cyan))
+  |> Table.render()
+
+network_table =
+  Table.new()
+  |> Table.headers(["Network", "Value"])
+  |> Table.row(["In", "1.2 GB/s"])
+  |> Table.row(["Out", "0.8 GB/s"])
+  |> Table.row(["Latency", "12ms"])
+  |> Table.border(:rounded)
+  |> Table.header_style(style() |> bold() |> foreground(:magenta))
+  |> Table.render()
+
+# Print side by side (simplified - just sequential for demo)
+IO.puts(render_with_indent.(system_table, "   "))
+IO.puts("")
+IO.puts(render_with_indent.(network_table, "   "))
+
+IO.puts("")
+
+# 13. Test results table
+IO.puts("13. Test Results:\n")
+
+test_data = [
+  ["test_user_login", "passed", "0.023s"],
+  ["test_user_logout", "passed", "0.018s"],
+  ["test_invalid_password", "passed", "0.045s"],
+  ["test_session_timeout", "failed", "1.203s"],
+  ["test_remember_me", "skipped", "0.000s"],
+  ["test_oauth_flow", "passed", "0.892s"]
+]
+
+test_style = fn row, col ->
+  if col == 1 do
+    status = Enum.at(test_data, row) |> Enum.at(1)
+
+    case status do
+      "passed" -> style() |> foreground(:green)
+      "failed" -> style() |> foreground(:red) |> bold()
+      "skipped" -> style() |> foreground(:yellow) |> faint()
+      _ -> style()
+    end
+  else
+    style()
+  end
+end
+
+table =
+  Table.new()
+  |> Table.headers(["Test Name", "Result", "Duration"])
+  |> Table.rows(test_data)
+  |> Table.border(:normal)
+  |> Table.header_style(style() |> bold())
+  |> Table.style_func(test_style)
+  |> Table.render()
+
+table
+|> String.split("\n")
+|> Enum.each(&IO.puts("   #{&1}"))
+
+# Summary line
+passed = Enum.count(test_data, fn [_, status, _] -> status == "passed" end)
+failed = Enum.count(test_data, fn [_, status, _] -> status == "failed" end)
+skipped = Enum.count(test_data, fn [_, status, _] -> status == "skipped" end)
+
+summary =
+  [
+    render(style() |> foreground(:green), "#{passed} passed"),
+    render(style() |> foreground(:red), "#{failed} failed"),
+    render(style() |> foreground(:yellow), "#{skipped} skipped")
+  ]
+  |> Enum.join(", ")
+
+IO.puts("\n   Summary: #{summary}")
+
+IO.puts("")
+
+# 14. Git log / Changelog style
+IO.puts("14. Git Log Style:\n")
+
+commits = [
+  ["a1b2c3d", "Alice", "feat: add user authentication"],
+  ["e4f5g6h", "Bob", "fix: resolve memory leak in cache"],
+  ["i7j8k9l", "Carol", "docs: update API documentation"],
+  ["m0n1o2p", "Alice", "refactor: extract validation logic"],
+  ["q3r4s5t", "Dave", "test: add integration tests"]
+]
+
+commit_style = fn _row, col ->
+  case col do
+    0 -> style() |> foreground(:yellow)
+    1 -> style() |> foreground(:cyan)
+    2 -> style()
+    _ -> style()
+  end
+end
+
+table =
+  Table.new()
+  |> Table.headers(["Commit", "Author", "Message"])
+  |> Table.rows(commits)
+  |> Table.border(:rounded)
+  |> Table.header_style(style() |> bold() |> foreground(:white))
+  |> Table.style_func(commit_style)
+  |> Table.render()
+
+table
+|> String.split("\n")
+|> Enum.each(&IO.puts("   #{&1}"))
+
+IO.puts("")
+
 IO.puts("=== Demo Complete ===\n")

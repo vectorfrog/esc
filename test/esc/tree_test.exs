@@ -3,6 +3,12 @@ defmodule Esc.TreeTest do
   alias Esc.Tree
   import Esc.Test.RenderHelpers
 
+  # Clear theme before tests to ensure predictable output
+  setup do
+    Esc.clear_theme()
+    :ok
+  end
+
   describe "root/1" do
     test "creates a tree with a root label" do
       tree = Tree.root("Root")

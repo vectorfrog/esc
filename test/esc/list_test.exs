@@ -2,6 +2,12 @@ defmodule Esc.ListTest do
   use ExUnit.Case
   alias Esc.List, as: L
 
+  # Clear theme before tests to ensure predictable output
+  setup do
+    Esc.clear_theme()
+    :ok
+  end
+
   describe "new/1" do
     test "creates a list with items" do
       list = L.new(["Item 1", "Item 2", "Item 3"])

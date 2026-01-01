@@ -20,6 +20,16 @@ defmodule Esc.Table do
   - `header_style/2` - Style for header row
   - `row_style/2` - Style for all data rows
   - `style_func/2` - Function for per-cell styling based on row/column
+
+  ## Theme Integration
+
+  When a global theme is set (via `Esc.set_theme/1`) and `use_theme` is enabled (default),
+  the table automatically uses theme colors:
+
+  - Header text: theme `:header` color (bold)
+  - Border: theme `:muted` color
+
+  Explicit styles override theme colors. Use `use_theme(table, false)` to disable.
   """
 
   alias Esc.Border
@@ -30,7 +40,8 @@ defmodule Esc.Table do
             header_style: nil,
             row_style: nil,
             style_func: nil,
-            column_widths: %{}
+            column_widths: %{},
+            use_theme: true
 
   @type t :: %__MODULE__{
           headers: [String.t()],
@@ -39,7 +50,8 @@ defmodule Esc.Table do
           header_style: Esc.Style.t() | nil,
           row_style: Esc.Style.t() | nil,
           style_func: (non_neg_integer(), non_neg_integer() -> Esc.Style.t()) | nil,
-          column_widths: %{non_neg_integer() => non_neg_integer()}
+          column_widths: %{non_neg_integer() => non_neg_integer()},
+          use_theme: boolean()
         }
 
   @doc """
@@ -119,6 +131,28 @@ defmodule Esc.Table do
   end
 
   @doc """
+  Enables or disables automatic theme colors.
+
+  When enabled (default), the table uses theme colors for:
+  - Header text (`:header` color, bold)
+  - Borders (`:muted` color)
+
+  Explicit styles (via `header_style/2`, `row_style/2`) override theme colors.
+
+  ## Examples
+
+      # Disable theme colors
+      Table.new() |> Table.use_theme(false)
+
+      # Re-enable theme colors
+      Table.new() |> Table.use_theme(true)
+  """
+  @spec use_theme(t(), boolean()) :: t()
+  def use_theme(%__MODULE__{} = table, enabled) when is_boolean(enabled) do
+    %{table | use_theme: enabled}
+  end
+
+  @doc """
   Renders the table to a string.
   """
   @spec render(t()) :: String.t()
@@ -151,23 +185,28 @@ defmodule Esc.Table do
 
   defp render_with_border(table, col_widths) do
     border = Border.get(table.border) || Border.get(:normal)
+    border_color = get_effective_border_color(table)
 
     # Build top line with proper intersections
     top_segments = col_widths |> Enum.map(&String.duplicate(border.top, &1 + 2))
     top_line = border.top_left <> Enum.join(top_segments, border.top_mid) <> border.top_right
+    top_line = apply_border_color(top_line, border_color)
 
     # Build bottom line with proper intersections
     bottom_segments = col_widths |> Enum.map(&String.duplicate(border.bottom, &1 + 2))
     bottom_line = border.bottom_left <> Enum.join(bottom_segments, border.bottom_mid) <> border.bottom_right
+    bottom_line = apply_border_color(bottom_line, border_color)
 
     # Header separator (between header and data) with proper intersections
     header_segments = col_widths |> Enum.map(&String.duplicate(border.top, &1 + 2))
     header_sep = border.left_mid <> Enum.join(header_segments, border.cross) <> border.right_mid
+    header_sep = apply_border_color(header_sep, border_color)
 
     # Render headers (border lines stay unstyled to avoid background bleeding)
     lines =
       if table.headers != [] do
-        header_line = render_row(table.headers, col_widths, border, fn _col -> table.header_style end)
+        header_style = get_effective_header_style(table)
+        header_line = render_row(table.headers, col_widths, border, border_color, fn _col -> header_style end)
         [top_line, header_line, header_sep]
       else
         [top_line]
@@ -179,7 +218,7 @@ defmodule Esc.Table do
       |> Enum.with_index()
       |> Enum.map(fn {row, row_idx} ->
         style_resolver = get_style_resolver(table, row_idx)
-        render_row(row, col_widths, border, style_resolver)
+        render_row(row, col_widths, border, border_color, style_resolver)
       end)
 
     lines = lines ++ data_lines ++ [bottom_line]
@@ -192,7 +231,8 @@ defmodule Esc.Table do
     # Render headers
     lines =
       if table.headers != [] do
-        header_line = render_row_plain(table.headers, col_widths, fn _col -> table.header_style end)
+        header_style = get_effective_header_style(table)
+        header_line = render_row_plain(table.headers, col_widths, fn _col -> header_style end)
         lines ++ [header_line]
       else
         lines
@@ -212,7 +252,7 @@ defmodule Esc.Table do
     Enum.join(lines, "\n")
   end
 
-  defp render_row(row, col_widths, border, style_resolver) do
+  defp render_row(row, col_widths, border, border_color, style_resolver) do
     cells =
       Enum.zip(row ++ List.duplicate("", length(col_widths) - length(row)), col_widths)
       |> Enum.with_index()
@@ -222,8 +262,11 @@ defmodule Esc.Table do
         if style, do: Esc.render(style, padded), else: padded
       end)
 
-    # Join cells with unstyled separators to match table borders
-    border.left <> Enum.join(cells, border.left) <> border.right
+    # Join cells with styled separators
+    left = apply_border_color(border.left, border_color)
+    right = apply_border_color(border.right, border_color)
+    sep = apply_border_color(border.left, border_color)
+    left <> Enum.join(cells, sep) <> right
   end
 
   defp render_row_plain(row, col_widths, style_resolver) do
@@ -302,5 +345,45 @@ defmodule Esc.Table do
     current_width = display_width(string)
     padding_needed = max(target_width - current_width, 0)
     string <> String.duplicate(" ", padding_needed)
+  end
+
+  # Theme-aware style resolution
+
+  # Gets effective header style: explicit style > theme style > nil
+  defp get_effective_header_style(table) do
+    case {table.header_style, table.use_theme, Esc.get_theme()} do
+      {style, _, _} when not is_nil(style) ->
+        # Explicit style takes precedence
+        style
+
+      {nil, true, theme} when not is_nil(theme) ->
+        # Use theme colors
+        Esc.style()
+        |> Esc.foreground(Esc.Theme.color(theme, :header))
+        |> Esc.bold()
+
+      _ ->
+        nil
+    end
+  end
+
+  # Gets effective border color from theme
+  defp get_effective_border_color(table) do
+    case {table.use_theme, Esc.get_theme()} do
+      {true, theme} when not is_nil(theme) ->
+        Esc.Theme.color(theme, :muted)
+
+      _ ->
+        nil
+    end
+  end
+
+  # Applies border color to a string (for border characters)
+  defp apply_border_color(string, nil), do: string
+
+  defp apply_border_color(string, color) do
+    Esc.style()
+    |> Esc.foreground(color)
+    |> Esc.render(string)
   end
 end

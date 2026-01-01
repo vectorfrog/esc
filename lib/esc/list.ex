@@ -28,13 +28,23 @@ defmodule Esc.List do
       nested = List.new(["Sub-item 1", "Sub-item 2"])
       List.new(["Main item", nested])
       |> List.render()
+
+  ## Theme Integration
+
+  When a global theme is set (via `Esc.set_theme/1`) and `use_theme` is enabled (default),
+  the list automatically uses theme colors:
+
+  - Enumerators: theme `:muted` color
+
+  Explicit styles override theme colors. Use `use_theme(list, false)` to disable.
   """
 
   defstruct items: [],
             enumerator: :bullet,
             enumerator_style: nil,
             item_style: nil,
-            indent: 0
+            indent: 0,
+            use_theme: true
 
   @type item :: String.t() | t()
 
@@ -43,7 +53,8 @@ defmodule Esc.List do
           enumerator: atom() | (non_neg_integer() -> String.t()),
           enumerator_style: Esc.Style.t() | nil,
           item_style: Esc.Style.t() | nil,
-          indent: non_neg_integer()
+          indent: non_neg_integer(),
+          use_theme: boolean()
         }
 
   @doc """
@@ -99,6 +110,24 @@ defmodule Esc.List do
   end
 
   @doc """
+  Enables or disables automatic theme colors.
+
+  When enabled (default), the list uses theme colors for:
+  - Enumerators (`:muted` color)
+
+  Explicit styles (via `enumerator_style/2`) override theme colors.
+
+  ## Examples
+
+      # Disable theme colors
+      List.new(["Item 1", "Item 2"]) |> List.use_theme(false)
+  """
+  @spec use_theme(t(), boolean()) :: t()
+  def use_theme(%__MODULE__{} = list, enabled) when is_boolean(enabled) do
+    %{list | use_theme: enabled}
+  end
+
+  @doc """
   Renders the list to a string.
   """
   @spec render(t()) :: String.t()
@@ -111,6 +140,7 @@ defmodule Esc.List do
 
   defp render_items(items, list, depth) do
     base_indent = String.duplicate(" ", list.indent + depth * 2)
+    enumerator_style = get_effective_enumerator_style(list)
 
     {lines, _} =
       Enum.reduce(items, {[], 0}, fn item, {acc, idx} ->
@@ -124,8 +154,8 @@ defmodule Esc.List do
             enum_text = get_enumerator(list.enumerator, idx)
 
             styled_enum =
-              if list.enumerator_style do
-                Esc.render(list.enumerator_style, enum_text)
+              if enumerator_style do
+                Esc.render(enumerator_style, enum_text)
               else
                 enum_text
               end
@@ -148,7 +178,8 @@ defmodule Esc.List do
     %{nested |
       enumerator_style: nested.enumerator_style || parent.enumerator_style,
       item_style: nested.item_style || parent.item_style,
-      indent: parent.indent
+      indent: parent.indent,
+      use_theme: nested.use_theme && parent.use_theme
     }
   end
 
@@ -176,5 +207,24 @@ defmodule Esc.List do
 
   defp to_alphabet(idx) do
     <<97 + rem(idx, 26)>>
+  end
+
+  # Theme-aware style resolution
+
+  # Gets effective enumerator style: explicit style > theme style > nil
+  defp get_effective_enumerator_style(list) do
+    case {list.enumerator_style, list.use_theme, Esc.get_theme()} do
+      {style, _, _} when not is_nil(style) ->
+        # Explicit style takes precedence
+        style
+
+      {nil, true, theme} when not is_nil(theme) ->
+        # Use theme colors
+        Esc.style()
+        |> Esc.foreground(Esc.Theme.color(theme, :muted))
+
+      _ ->
+        nil
+    end
   end
 end

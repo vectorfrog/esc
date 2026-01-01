@@ -3,6 +3,12 @@ defmodule Esc.TableTest do
   alias Esc.Table
   import Esc.Test.RenderHelpers
 
+  # Clear theme before tests to ensure predictable output
+  setup do
+    Esc.clear_theme()
+    :ok
+  end
+
   describe "new/0" do
     test "creates an empty table" do
       table = Table.new()

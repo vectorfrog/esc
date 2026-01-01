@@ -33,6 +33,7 @@ style()
 - [Tables](#tables)
 - [Lists](#lists)
 - [Trees](#trees)
+- [Themes](#themes)
 - [Terminal Detection](#terminal-detection)
 - [License](#license)
 
@@ -418,6 +419,94 @@ Tree.enumerator(:rounded)         # ├── ╰──
 Tree.root_style(style)            # Style for root node
 Tree.item_style(style)            # Style for children
 Tree.enumerator_style(style)      # Style for connectors
+```
+
+## Themes
+
+Esc includes 12 built-in themes based on popular terminal color schemes. Set a theme globally to automatically apply colors to all components.
+
+```elixir
+# Set a global theme
+Esc.set_theme(:dracula)
+
+# Available themes
+Esc.themes()
+# => [:dracula, :nord, :gruvbox, :one, :solarized, :monokai,
+#     :material, :github, :aura, :dolphin, :chalk, :cobalt]
+```
+
+### Theme Colors
+
+Themes provide semantic colors for common UI purposes:
+
+```elixir
+Esc.set_theme(:nord)
+
+# Use semantic colors in styles
+style() |> Esc.theme_foreground(:error) |> render("Error message")
+style() |> Esc.theme_foreground(:success) |> render("Success!")
+style() |> Esc.theme_foreground(:warning) |> render("Warning")
+style() |> Esc.theme_foreground(:header) |> render("Header text")
+style() |> Esc.theme_foreground(:muted) |> render("Subdued text")
+
+# Access theme colors directly
+Esc.theme_color(:error)    # => {191, 97, 106}
+Esc.theme_color(:success)  # => {163, 190, 140}
+```
+
+**Semantic colors:**
+- `:header` - Headers, titles (cyan)
+- `:emphasis` - Important text (blue)
+- `:success` - Success messages (green)
+- `:warning` - Warning messages (yellow)
+- `:error` - Error messages (red)
+- `:muted` - Subdued text, borders (gray)
+
+### Auto-Themed Components
+
+When a theme is set, Table, Tree, and List components automatically use theme colors:
+
+```elixir
+Esc.set_theme(:dracula)
+
+# Table headers use :header color, borders use :muted
+Table.new()
+|> Table.headers(["Name", "Status"])
+|> Table.row(["Build", "Passing"])
+|> Table.border(:rounded)
+|> Table.render()
+
+# Tree root uses :emphasis, connectors use :muted
+Tree.root("Project")
+|> Tree.child("src")
+|> Tree.child("test")
+|> Tree.render()
+
+# List enumerators use :muted
+List.new(["First", "Second", "Third"])
+|> List.enumerator(:arabic)
+|> List.render()
+```
+
+Disable auto-theming for specific components:
+
+```elixir
+Table.new()
+|> Table.use_theme(false)  # Disable theme colors
+|> Table.headers(["A", "B"])
+|> Table.render()
+```
+
+### Theme Management
+
+```elixir
+Esc.set_theme(:nord)       # Set theme by name
+Esc.get_theme()            # Get current theme struct
+Esc.clear_theme()          # Clear theme (disable theming)
+Esc.themes()               # List available theme names
+
+# Configure default theme in config.exs
+config :esc, theme: :dracula
 ```
 
 ## Terminal Detection

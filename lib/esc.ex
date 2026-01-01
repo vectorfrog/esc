@@ -30,7 +30,7 @@ defmodule Esc do
   Available border styles: `:normal`, `:rounded`, `:thick`, `:double`, `:hidden`
   """
 
-  alias Esc.{Style, Color, Border}
+  alias Esc.{Style, Color, Border, Theme}
 
   @type style :: Style.t()
 
@@ -502,6 +502,154 @@ defmodule Esc do
       String.contains?(term, "color") -> :ansi
       term != "" -> :ansi
       true -> :no_color
+    end
+  end
+
+  # Themes
+
+  @doc """
+  Sets the global theme.
+
+  Themes provide a consistent color palette including 16 ANSI colors,
+  background/foreground colors, and semantic colors for common UI purposes.
+
+  ## Examples
+
+      Esc.set_theme(:nord)
+      Esc.set_theme(:dracula)
+
+  ## Available Themes
+
+  #{Enum.map_join(Theme.Palette.list(), ", ", &inspect/1)}
+  """
+  @spec set_theme(atom() | Theme.t()) :: :ok | {:error, :unknown_theme}
+  def set_theme(theme), do: Theme.Store.set(theme)
+
+  @doc """
+  Gets the current global theme, or nil if not set.
+
+  ## Examples
+
+      Esc.set_theme(:nord)
+      Esc.get_theme()
+      #=> %Esc.Theme{name: :nord, ...}
+  """
+  @spec get_theme() :: Theme.t() | nil
+  def get_theme, do: Theme.Store.get()
+
+  @doc """
+  Clears the current global theme.
+
+  After clearing, `get_theme/0` will return nil (or fall back to Application config).
+  """
+  @spec clear_theme() :: :ok
+  def clear_theme, do: Theme.Store.clear()
+
+  @doc """
+  Lists all available built-in theme names.
+
+  ## Examples
+
+      Esc.themes()
+      #=> [:dracula, :nord, :gruvbox, :one, :solarized, :monokai,
+      #    :material, :github, :aura, :dolphin, :chalk, :cobalt]
+  """
+  @spec themes() :: [atom()]
+  def themes, do: Theme.Palette.list()
+
+  @doc """
+  Gets a color from the current theme by name.
+
+  Returns nil if no theme is set or the color is not defined.
+
+  ## Semantic Colors
+
+  - `:header` - Headers, titles (defaults to cyan)
+  - `:emphasis` - Important text (defaults to blue)
+  - `:warning` - Warning messages (defaults to yellow)
+  - `:error` - Error messages (defaults to red)
+  - `:success` - Success messages (defaults to green)
+  - `:muted` - Subdued text, borders (defaults to gray)
+
+  ## ANSI Colors
+
+  `:ansi_0` through `:ansi_15`, `:background`, `:foreground`
+
+  ## Examples
+
+      Esc.set_theme(:nord)
+      Esc.theme_color(:error)
+      #=> {191, 97, 106}
+  """
+  @spec theme_color(atom()) :: Style.color() | nil
+  def theme_color(name) do
+    case get_theme() do
+      nil -> nil
+      theme -> Theme.color(theme, name)
+    end
+  end
+
+  @doc """
+  Sets foreground color from the current theme.
+
+  If no theme is set or the color is not defined, the style is unchanged.
+
+  ## Examples
+
+      style() |> theme_foreground(:error) |> render("Error!")
+  """
+  @spec theme_foreground(style(), atom()) :: style()
+  def theme_foreground(%Style{} = s, color_name) do
+    case theme_color(color_name) do
+      nil -> s
+      color -> foreground(s, color)
+    end
+  end
+
+  @doc """
+  Sets background color from the current theme.
+
+  If no theme is set or the color is not defined, the style is unchanged.
+
+  ## Examples
+
+      style() |> theme_background(:success) |> render("Success!")
+  """
+  @spec theme_background(style(), atom()) :: style()
+  def theme_background(%Style{} = s, color_name) do
+    case theme_color(color_name) do
+      nil -> s
+      color -> background(s, color)
+    end
+  end
+
+  @doc """
+  Sets border foreground color from the current theme.
+
+  If no theme is set or the color is not defined, the style is unchanged.
+
+  ## Examples
+
+      style() |> border(:rounded) |> theme_border_foreground(:muted) |> render("Box")
+  """
+  @spec theme_border_foreground(style(), atom()) :: style()
+  def theme_border_foreground(%Style{} = s, color_name) do
+    case theme_color(color_name) do
+      nil -> s
+      color -> border_foreground(s, color)
+    end
+  end
+
+  @doc """
+  Sets border background color from the current theme.
+
+  If no theme is set or the color is not defined, the style is unchanged.
+  """
+  @spec theme_border_background(style(), atom()) :: style()
+  def theme_border_background(%Style{} = s, color_name) do
+    case theme_color(color_name) do
+      nil -> s
+      color -> border_background(s, color)
     end
   end
 

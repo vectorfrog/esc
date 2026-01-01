@@ -218,4 +218,153 @@ defmodule Esc.TableTest do
       assert visible_width(hd(lines)) >= 22
     end
   end
+
+  describe "max_column_width/3" do
+    test "wraps text at word boundaries" do
+      result =
+        Table.new()
+        |> Table.headers(["Description"])
+        |> Table.row(["This is a long description that should wrap"])
+        |> Table.max_column_width(0, 20)
+        |> Table.border(:rounded)
+        |> Table.render()
+
+      lines = String.split(result, "\n")
+      # Should have multiple content lines due to wrapping
+      content_lines = Enum.filter(lines, &String.contains?(&1, "│"))
+      assert length(content_lines) > 1
+    end
+
+    test "limits column to specified max width" do
+      result =
+        Table.new()
+        |> Table.headers(["A"])
+        |> Table.row(["This is very long content that exceeds the max width"])
+        |> Table.max_column_width(0, 15)
+        |> Table.border(:normal)
+        |> Table.render()
+
+      lines = String.split(result, "\n")
+      # Each line should fit within the max width plus border/padding
+      # Border is 1 + padding is 1 on each side = 4 total overhead per column
+      assert Enum.all?(lines, fn line -> visible_width(line) <= 15 + 4 end)
+    end
+  end
+
+  describe "max_width/2" do
+    test "constrains table to specified width" do
+      result =
+        Table.new()
+        |> Table.headers(["Title", "Description"])
+        |> Table.row(["Hello World", "This is a description that is quite long"])
+        |> Table.max_width(50)
+        |> Table.border(:rounded)
+        |> Table.render()
+
+      lines = String.split(result, "\n")
+      # All lines should be <= 50 characters
+      assert Enum.all?(lines, fn line -> visible_width(line) <= 50 end)
+    end
+
+    test "accepts :terminal as max width" do
+      table =
+        Table.new()
+        |> Table.headers(["A"])
+        |> Table.max_width(:terminal)
+
+      assert table.max_width == :terminal
+    end
+  end
+
+  describe "wrap_mode/2" do
+    test "sets wrap mode to :word (default)" do
+      table =
+        Table.new()
+        |> Table.wrap_mode(:word)
+
+      assert table.wrap_mode == :word
+    end
+
+    test "sets wrap mode to :char" do
+      table =
+        Table.new()
+        |> Table.wrap_mode(:char)
+
+      assert table.wrap_mode == :char
+    end
+
+    test "sets wrap mode to :truncate" do
+      table =
+        Table.new()
+        |> Table.wrap_mode(:truncate)
+
+      assert table.wrap_mode == :truncate
+    end
+
+    test "truncate mode adds ellipsis" do
+      result =
+        Table.new()
+        |> Table.headers(["Name"])
+        |> Table.row(["This is a very long name that should be truncated"])
+        |> Table.max_column_width(0, 15)
+        |> Table.wrap_mode(:truncate)
+        |> Table.border(:rounded)
+        |> Table.render()
+
+      assert result =~ "…"
+    end
+
+    test "char wrap mode breaks at character boundaries" do
+      result =
+        Table.new()
+        |> Table.headers(["Name"])
+        |> Table.row(["abcdefghijklmnopqrstuvwxyz"])
+        |> Table.max_column_width(0, 10)
+        |> Table.wrap_mode(:char)
+        |> Table.border(:rounded)
+        |> Table.render()
+
+      lines = String.split(result, "\n")
+      content_lines = Enum.filter(lines, &String.contains?(&1, "│"))
+      # Should wrap the long word across multiple lines
+      assert length(content_lines) > 1
+    end
+  end
+
+  describe "multi-line cell rendering" do
+    test "cells in the same row align vertically" do
+      result =
+        Table.new()
+        |> Table.headers(["Short", "Long"])
+        |> Table.row(["A", "This is a very long text that will wrap to multiple lines"])
+        |> Table.max_column_width(1, 20)
+        |> Table.border(:rounded)
+        |> Table.render()
+
+      lines = String.split(result, "\n")
+      # All content lines should have same width (aligned borders)
+      content_lines = Enum.filter(lines, &String.contains?(&1, "│"))
+      widths = Enum.map(content_lines, &visible_width/1)
+      assert length(Enum.uniq(widths)) == 1
+    end
+
+    test "empty cells are properly padded in multi-line rows" do
+      result =
+        Table.new()
+        |> Table.headers(["A", "B"])
+        |> Table.row(["Short", "This text is long enough to wrap to multiple lines here"])
+        |> Table.max_column_width(1, 15)
+        |> Table.border(:rounded)
+        |> Table.render()
+
+      lines = String.split(result, "\n")
+      # All lines between top and bottom should have proper structure
+      middle_lines = Enum.slice(lines, 1, length(lines) - 2)
+
+      for line <- middle_lines do
+        # Each line should have proper border structure
+        assert String.starts_with?(line, "│") or String.starts_with?(line, "├") or String.starts_with?(line, "╭") or String.starts_with?(line, "╰")
+      end
+    end
+  end
 end

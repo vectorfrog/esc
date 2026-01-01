@@ -266,45 +266,86 @@ table
 
 IO.puts("")
 
-# 11. Long content with truncation
-IO.puts("11. Long Content (manual truncation):\n")
+# 11. Full-Width Table with Automatic Text Wrapping
+IO.puts("11. Full Terminal Width (automatic wrapping + row separators):\n")
 
-truncate = fn str, max_len ->
-  if String.length(str) > max_len do
-    String.slice(str, 0, max_len - 1) <> "…"
-  else
-    str
-  end
-end
+# This table automatically:
+# - Detects terminal width and wraps text within cells
+# - Adds row separator lines when any row wraps (for readability)
+# No configuration needed - it just works!
 
-long_data = [
-  ["api-gateway", "Running for 45 days without issues", "/var/log/api.log"],
-  ["auth-service", "Restarted after memory spike detected", "/var/log/auth.log"],
-  ["data-processor", "Processing batch job #12847", "/var/log/proc.log"]
+article_data = [
+  ["AI Marketing Isn't As Scary As You Think | The Complete Roundtable Discussion",
+   "Neil Patel",
+   "2026-01-01",
+   "marketing, search-everywhere-optimization, ai-search, cross-team-collaboration, social-search, content-strategy, Neil Patel, NP Digital, roundtable"],
+  ["Predicting the 5 Top SEO Trends for 2026",
+   "Neil Patel",
+   "2026-01-01",
+   "marketing, seo-trends, ai-search, brand-citations, voice-search, ai-advertising, Neil Patel, ChatGPT, Perplexity, tutorial"],
+  ["The New SEO Playbook: Complete Guide to Modern Search Optimization",
+   "Neil Patel",
+   "2026-01-01",
+   "marketing, ai-search, seo, content-optimization, ai-overviews, structured-data, Neil Patel, NP Digital, tutorial"]
 ]
-
-truncated_rows =
-  long_data
-  |> Enum.map(fn [svc, desc, log] ->
-    [truncate.(svc, 12), truncate.(desc, 25), truncate.(log, 18)]
-  end)
 
 table =
   Table.new()
-  |> Table.headers(["Service", "Description", "Log File"])
-  |> Table.rows(truncated_rows)
+  |> Table.headers(["Title", "Author", "Date", "Tags"])
+  |> Table.rows(article_data)
   |> Table.border(:rounded)
-  |> Table.header_style(style() |> bold() |> foreground(:white))
+  |> Table.header_style(style() |> bold() |> foreground(:cyan))
   |> Table.render()
 
-table
-|> String.split("\n")
-|> Enum.each(&IO.puts("   #{&1}"))
-
+IO.puts(table)
 IO.puts("")
 
-# 12. Dashboard-style metrics (multiple small tables)
-IO.puts("12. Dashboard Layout (multiple tables):\n")
+# 12. Wrap Modes Comparison
+IO.puts("12. Wrap Modes (:word vs :char vs :truncate):\n")
+
+long_text = "This is a very long description that demonstrates different wrapping behaviors"
+
+IO.puts("   :word (default) - Wraps at word boundaries:")
+table =
+  Table.new()
+  |> Table.headers(["Mode", "Content"])
+  |> Table.row(["word", long_text])
+  |> Table.border(:rounded)
+  |> Table.max_column_width(1, 35)
+  |> Table.wrap_mode(:word)
+  |> Table.render()
+
+table |> String.split("\n") |> Enum.each(&IO.puts("   #{&1}"))
+IO.puts("")
+
+IO.puts("   :char - Wraps at character boundaries:")
+table =
+  Table.new()
+  |> Table.headers(["Mode", "Content"])
+  |> Table.row(["char", long_text])
+  |> Table.border(:rounded)
+  |> Table.max_column_width(1, 35)
+  |> Table.wrap_mode(:char)
+  |> Table.render()
+
+table |> String.split("\n") |> Enum.each(&IO.puts("   #{&1}"))
+IO.puts("")
+
+IO.puts("   :truncate - Truncates with ellipsis:")
+table =
+  Table.new()
+  |> Table.headers(["Mode", "Content"])
+  |> Table.row(["truncate", long_text])
+  |> Table.border(:rounded)
+  |> Table.max_column_width(1, 35)
+  |> Table.wrap_mode(:truncate)
+  |> Table.render()
+
+table |> String.split("\n") |> Enum.each(&IO.puts("   #{&1}"))
+IO.puts("")
+
+# 13. Dashboard-style metrics (multiple small tables)
+IO.puts("13. Dashboard Layout (multiple tables):\n")
 
 # Helper to render table with indent
 render_with_indent = fn table_str, indent ->
@@ -341,8 +382,8 @@ IO.puts(render_with_indent.(network_table, "   "))
 
 IO.puts("")
 
-# 13. Test results table
-IO.puts("13. Test Results:\n")
+# 14. Test results table
+IO.puts("14. Test Results:\n")
 
 test_data = [
   ["test_user_login", "passed", "0.023s"],
@@ -398,8 +439,8 @@ IO.puts("\n   Summary: #{summary}")
 
 IO.puts("")
 
-# 14. Git log / Changelog style
-IO.puts("14. Git Log Style:\n")
+# 15. Git log / Changelog style
+IO.puts("15. Git Log Style:\n")
 
 commits = [
   ["a1b2c3d", "Alice", "feat: add user authentication"],

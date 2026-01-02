@@ -1,7 +1,7 @@
 defmodule Esc.MixProject do
   use Mix.Project
 
-  @version "0.3.0"
+  @version "0.4.0"
   @source_url "https://github.com/vectorfrog/esc"
 
   def project do
@@ -32,7 +32,7 @@ defmodule Esc.MixProject do
   end
 
   defp description do
-    "Declarative terminal styling for Elixir. Colors, borders, padding, and layout."
+    "Declarative terminal styling for Elixir. Colors, borders, padding, layout, tables, trees, and interactive select menus."
   end
 
   defp package do

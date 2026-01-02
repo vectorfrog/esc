@@ -4,7 +4,7 @@
 
 Declarative terminal styling for Elixir, inspired by [Lipgloss](https://github.com/charmbracelet/lipgloss).
 
-Esc provides an expressive, composable API for styling terminal output with colors, borders, padding, margins, and alignment. It also includes components for tables, lists, and trees.
+Esc provides an expressive, composable API for styling terminal output with colors, borders, padding, margins, and alignment. It also includes components for tables, lists, trees, and interactive select menus.
 
 ![Text on Background](assets/Text_on_Background.png)
 
@@ -33,6 +33,7 @@ style()
 - [Tables](#tables)
 - [Lists](#lists)
 - [Trees](#trees)
+- [Select](#select)
 - [Themes](#themes)
 - [Terminal Detection](#terminal-detection)
 - [License](#license)
@@ -356,7 +357,7 @@ L.new(["First item", "Second item", "Third item"])
 ```
 
 Output:
-```
+```text
 1. First item
 2. Second item
 3. Third item
@@ -421,6 +422,104 @@ Tree.item_style(style)            # Style for children
 Tree.enumerator_style(style)      # Style for connectors
 ```
 
+## Select
+
+Interactive selection menus for CLI applications. Users navigate with arrow keys (or j/k) and confirm with Enter.
+
+> **Requires OTP 28+** - The Select component uses OTP 28's native raw terminal mode. See [OTP 28 Setup](#otp-28-setup) below.
+
+```elixir
+alias Esc.Select
+
+case Select.new(["Option A", "Option B", "Option C"]) |> Select.run() do
+  {:ok, choice} -> IO.puts("You selected: #{choice}")
+  :cancelled -> IO.puts("Cancelled")
+end
+```
+
+### Items with Return Values
+
+Items can be tuples of `{display_text, return_value}`:
+
+```elixir
+environments = [
+  {"Production", :prod},
+  {"Staging", :staging},
+  {"Development", :dev}
+]
+
+case Select.new(environments) |> Select.run() do
+  {:ok, env} -> deploy_to(env)  # env is :prod, :staging, or :dev
+  :cancelled -> IO.puts("Cancelled")
+end
+```
+
+### Styling
+
+```elixir
+Select.new(["Phoenix", "Plug", "Bandit"])
+|> Select.cursor("❯ ")                                    # Custom cursor
+|> Select.cursor_style(Esc.style() |> Esc.foreground(:cyan))
+|> Select.selected_style(Esc.style() |> Esc.bold())
+|> Select.item_style(Esc.style() |> Esc.foreground(:white))
+|> Select.run()
+```
+
+### Theme Integration
+
+Select automatically uses theme colors when a global theme is set:
+
+```elixir
+Esc.set_theme(:dracula)
+
+# Cursor uses :emphasis, selected item uses :header
+Select.new(["A", "B", "C"]) |> Select.run()
+
+# Disable theme colors
+Select.new(["A", "B", "C"]) |> Select.use_theme(false) |> Select.run()
+```
+
+### Keyboard Controls
+
+| Key | Action |
+|-----|--------|
+| `↑` / `k` | Move up |
+| `↓` / `j` | Move down |
+| `Enter` / `Space` | Confirm selection |
+| `q` / `Escape` | Cancel |
+| `g` / `Home` | Jump to first |
+| `G` / `End` | Jump to last |
+
+### OTP 28 Setup
+
+The Select component requires Erlang/OTP 28 or later for native raw terminal mode support. We recommend using [asdf](https://asdf-vm.com/) to manage Erlang/Elixir versions:
+
+```bash
+# Install asdf plugins (if not already installed)
+asdf plugin add erlang
+asdf plugin add elixir
+
+# Install OTP 28 and compatible Elixir
+asdf install erlang 28.3
+asdf install elixir 1.19.4-otp-28
+
+# Set versions for your project (creates .tool-versions)
+cd your_project
+asdf local erlang 28.3
+asdf local elixir 1.19.4-otp-28
+
+# Verify
+erl -eval 'erlang:display(erlang:system_info(otp_release)), halt().' -noshell
+# Should output: "28"
+```
+
+Alternatively, add a `.tool-versions` file to your project:
+
+```
+erlang 28.3
+elixir 1.19.4-otp-28
+```
+
 ## Themes
 
 Esc includes 12 built-in themes based on popular terminal color schemes. Set a theme globally to automatically apply colors to all components.
@@ -464,7 +563,7 @@ Esc.theme_color(:success)  # => {163, 190, 140}
 
 ### Auto-Themed Components
 
-When a theme is set, Table, Tree, and List components automatically use theme colors:
+When a theme is set, Table, Tree, List, and Select components automatically use theme colors:
 
 ```elixir
 Esc.set_theme(:dracula)

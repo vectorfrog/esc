@@ -603,12 +603,20 @@ defmodule Esc.Table do
   end
 
   # Calculate display width accounting for wide characters (emojis, CJK, etc.)
+  # Strips ANSI escape codes before measuring so styled content is handled correctly
   defp display_width(string) do
     string
+    |> strip_ansi()
     |> String.graphemes()
     |> Enum.reduce(0, fn grapheme, acc ->
       acc + grapheme_width(grapheme)
     end)
+  end
+
+  # Strip ANSI escape codes from a string
+  defp strip_ansi(string) do
+    # Match ANSI escape sequences: ESC[ followed by params and a letter
+    Regex.replace(~r/\e\[[0-9;]*[a-zA-Z]/, string, "")
   end
 
   # Determine width of a single grapheme
@@ -628,6 +636,8 @@ defmodule Esc.Table do
       # Miscellaneous symbols (0x2600-0x26FF) - remain 1 wide even with FE0F
       # These have ambiguous width and many terminals render them as 1 column
       first_cp in 0x2600..0x26FF -> 1
+      # Dingbats (0x2700-0x27BF) are typically width 1 unless with emoji variation selector
+      first_cp in 0x2700..0x27BF -> 1
       # Emoji variation selector forces emoji presentation (2 wide) for other ranges
       has_emoji_variation -> 2
       # Standard emoji ranges (always 2 wide)
@@ -637,8 +647,6 @@ defmodule Esc.Table do
       first_cp in 0x1F1E0..0x1F1FF -> 2
       first_cp in 0x1F400..0x1F4FF -> 2
       first_cp in 0x1F500..0x1F5FF -> 2
-      # Dingbats with default emoji presentation (2 wide)
-      first_cp in 0x2702..0x27B0 -> 2
       # CJK ranges
       first_cp in 0x4E00..0x9FFF -> 2
       first_cp in 0x3400..0x4DBF -> 2

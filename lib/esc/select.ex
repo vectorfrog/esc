@@ -30,9 +30,27 @@ defmodule Esc.Select do
   - `Up` / `k` - Move cursor up
   - `Down` / `j` - Move cursor down
   - `Enter` / `Space` - Confirm selection
-  - `Escape` / `q` - Cancel selection
+  - `Escape` / `q` - Cancel selection (or exit filter mode)
   - `Home` / `g` - Jump to first item
   - `End` / `G` - Jump to last item
+  - `/` - Enter filter mode
+
+  ## Filtering
+
+  Press `/` to enter filter mode and type to filter items:
+
+      # Filter narrows visible items as you type
+      Select.new(["apple", "apricot", "banana", "cherry"])
+      |> Select.run()
+      # Type "ap" to show only "apple" and "apricot"
+
+  Supports glob-style wildcards with `*`:
+
+      # "*.md" matches "readme.md", "CHANGELOG.md"
+      # "test*" matches "testing", "test_helper"
+      # "*api*" matches "api_client", "rest_api", "api"
+
+  Escape exits filter mode. Press Escape again to clear the filter.
 
   ## Theme Integration
 
@@ -51,7 +69,10 @@ defmodule Esc.Select do
             cursor_style: nil,
             selected_style: nil,
             item_style: nil,
-            use_theme: true
+            use_theme: true,
+            filter_mode: false,
+            filter_text: "",
+            filter_style: nil
 
   @type item :: String.t() | {String.t(), term()}
 
@@ -62,7 +83,10 @@ defmodule Esc.Select do
           cursor_style: Esc.Style.t() | nil,
           selected_style: Esc.Style.t() | nil,
           item_style: Esc.Style.t() | nil,
-          use_theme: boolean()
+          use_theme: boolean(),
+          filter_mode: boolean(),
+          filter_text: String.t(),
+          filter_style: Esc.Style.t() | nil
         }
 
   @doc """
@@ -132,6 +156,14 @@ defmodule Esc.Select do
   end
 
   @doc """
+  Sets the style for the filter input line.
+  """
+  @spec filter_style(t(), Esc.Style.t()) :: t()
+  def filter_style(%__MODULE__{} = select, style) do
+    %{select | filter_style: style}
+  end
+
+  @doc """
   Renders the select list at its current state (non-interactive).
 
   This is useful for previewing the select or for testing.
@@ -146,22 +178,41 @@ defmodule Esc.Select do
     cursor_style = get_effective_cursor_style(select)
     selected_style = get_effective_selected_style(select)
 
-    select.items
-    |> Enum.with_index()
-    |> Enum.map(fn {item, idx} ->
-      display_text = get_display_text(item)
-      is_selected = idx == select.selected_index
+    # Get filtered items with their original indices
+    filtered_indices = Esc.Filter.matching_indices(select.items, select.filter_text)
 
-      if is_selected do
-        styled_cursor = apply_style(select.cursor, cursor_style)
-        styled_text = apply_style(display_text, selected_style)
-        styled_cursor <> styled_text
-      else
-        styled_text = apply_style(display_text, select.item_style)
-        blank_cursor <> styled_text
-      end
-    end)
-    |> Enum.join("\n")
+    items_output =
+      filtered_indices
+      |> Enum.map(fn idx ->
+        item = Enum.at(select.items, idx)
+        display_text = Esc.Filter.get_display_text(item)
+        is_selected = idx == select.selected_index
+
+        if is_selected do
+          styled_cursor = apply_style(select.cursor, cursor_style)
+          styled_text = apply_style(display_text, selected_style)
+          styled_cursor <> styled_text
+        else
+          styled_text = apply_style(display_text, select.item_style)
+          blank_cursor <> styled_text
+        end
+      end)
+      |> Enum.join("\n")
+
+    # Add filter input if filter is active or has text
+    if select.filter_mode or select.filter_text != "" do
+      filter_style = get_effective_filter_style(select)
+      filter_line = Esc.Filter.render_filter_input(
+        select.filter_text,
+        select.filter_mode,
+        prompt_style: filter_style,
+        match_count: {length(filtered_indices), length(select.items)},
+        count_style: filter_style
+      )
+      filter_line <> "\n\n" <> items_output
+    else
+      items_output
+    end
   end
 
   @doc """
@@ -202,7 +253,15 @@ defmodule Esc.Select do
     # In raw mode, \n doesn't return to column 0, so use \r\n
     IO.write(String.replace(output, "\n", "\r\n"))
 
-    # Read input using OTP 28 raw mode
+    # Read input - behavior depends on filter mode
+    if select.filter_mode do
+      handle_filter_mode_input(select, line_count)
+    else
+      handle_normal_mode_input(select, line_count)
+    end
+  end
+
+  defp handle_normal_mode_input(select, line_count) do
     case read_key() do
       :up ->
         move_and_redraw(select, line_count, &move_up/1)
@@ -217,15 +276,98 @@ defmodule Esc.Select do
         move_and_redraw(select, line_count, &move_end/1)
 
       :enter ->
-        IO.write("\r\n")
-        {:ok, get_return_value(select)}
+        # Make sure cursor is on a valid filtered item
+        filtered_indices = Esc.Filter.matching_indices(select.items, select.filter_text)
+        if select.selected_index in filtered_indices do
+          IO.write("\r\n")
+          {:ok, get_return_value(select)}
+        else
+          move_and_redraw(select, line_count, & &1)
+        end
+
+      :filter ->
+        move_and_redraw(select, line_count, &enter_filter_mode/1)
 
       :cancel ->
-        clear_lines(line_count)
-        :cancelled
+        # If filter is active, first escape clears filter
+        if select.filter_text != "" do
+          move_and_redraw(select, line_count, &clear_filter/1)
+        else
+          clear_lines(line_count)
+          :cancelled
+        end
 
       _ ->
         move_and_redraw(select, line_count, & &1)
+    end
+  end
+
+  defp handle_filter_mode_input(select, line_count) do
+    case read_filter_key() do
+      :escape ->
+        # Exit filter mode; if filter empty and was empty, cancel
+        if select.filter_text == "" do
+          clear_lines(line_count)
+          :cancelled
+        else
+          move_and_redraw(select, line_count, &exit_filter_mode/1)
+        end
+
+      :enter ->
+        # Exit filter mode and confirm filter
+        move_and_redraw(select, line_count, &exit_filter_mode/1)
+
+      :backspace ->
+        move_and_redraw(select, line_count, &delete_filter_char/1)
+
+      :clear_line ->
+        move_and_redraw(select, line_count, fn s -> %{s | filter_text: ""} end)
+
+      {:char, char} ->
+        move_and_redraw(select, line_count, &add_filter_char(&1, char))
+
+      _ ->
+        move_and_redraw(select, line_count, & &1)
+    end
+  end
+
+  defp enter_filter_mode(select) do
+    %{select | filter_mode: true}
+  end
+
+  defp exit_filter_mode(select) do
+    # Ensure cursor is on a valid filtered item
+    select = %{select | filter_mode: false}
+    ensure_valid_cursor(select)
+  end
+
+  defp clear_filter(select) do
+    %{select | filter_text: "", selected_index: 0}
+  end
+
+  defp add_filter_char(select, char) do
+    new_filter = select.filter_text <> char
+    select = %{select | filter_text: new_filter}
+    ensure_valid_cursor(select)
+  end
+
+  defp delete_filter_char(%{filter_text: ""} = select), do: select
+  defp delete_filter_char(select) do
+    new_filter = String.slice(select.filter_text, 0..-2//1)
+    %{select | filter_text: new_filter}
+  end
+
+  defp ensure_valid_cursor(select) do
+    filtered_indices = Esc.Filter.matching_indices(select.items, select.filter_text)
+
+    if select.selected_index in filtered_indices do
+      select
+    else
+      # Move to first filtered item
+      case filtered_indices do
+        [first | _] -> %{select | selected_index: first}
+        [] -> select
+      end
     end
   end
 
@@ -235,23 +377,31 @@ defmodule Esc.Select do
   end
 
   defp move_up(%__MODULE__{} = select) do
-    count = length(select.items)
-    new_index = if select.selected_index == 0, do: count - 1, else: select.selected_index - 1
+    filtered_indices = Esc.Filter.matching_indices(select.items, select.filter_text)
+    current_pos = Enum.find_index(filtered_indices, &(&1 == select.selected_index)) || 0
+    new_pos = if current_pos == 0, do: length(filtered_indices) - 1, else: current_pos - 1
+    new_index = Enum.at(filtered_indices, new_pos) || select.selected_index
     %{select | selected_index: new_index}
   end
 
   defp move_down(%__MODULE__{} = select) do
-    count = length(select.items)
-    new_index = if select.selected_index == count - 1, do: 0, else: select.selected_index + 1
+    filtered_indices = Esc.Filter.matching_indices(select.items, select.filter_text)
+    current_pos = Enum.find_index(filtered_indices, &(&1 == select.selected_index)) || 0
+    new_pos = if current_pos == length(filtered_indices) - 1, do: 0, else: current_pos + 1
+    new_index = Enum.at(filtered_indices, new_pos) || select.selected_index
     %{select | selected_index: new_index}
   end
 
   defp move_home(%__MODULE__{} = select) do
-    %{select | selected_index: 0}
+    filtered_indices = Esc.Filter.matching_indices(select.items, select.filter_text)
+    new_index = List.first(filtered_indices) || 0
+    %{select | selected_index: new_index}
   end
 
   defp move_end(%__MODULE__{} = select) do
-    %{select | selected_index: length(select.items) - 1}
+    filtered_indices = Esc.Filter.matching_indices(select.items, select.filter_text)
+    new_index = List.last(filtered_indices) || length(select.items) - 1
+    %{select | selected_index: new_index}
   end
 
   # Key reading using OTP 28 raw mode with IO.getn
@@ -261,6 +411,7 @@ defmodule Esc.Select do
       "\r" -> :enter
       "\n" -> :enter
       " " -> :enter
+      "/" -> :filter
       "j" -> :down
       "k" -> :up
       "g" -> :home
@@ -268,6 +419,28 @@ defmodule Esc.Select do
       "q" -> :cancel
       <<3>> -> :cancel  # Ctrl+C
       :eof -> :cancel
+      _ -> :unknown
+    end
+  end
+
+  # Key reading in filter mode - captures printable characters
+  defp read_filter_key do
+    case read_char() do
+      "\e" -> :escape
+      "\r" -> :enter
+      "\n" -> :enter
+      <<127>> -> :backspace  # DEL
+      <<8>> -> :backspace    # BS
+      <<21>> -> :clear_line  # Ctrl+U
+      <<3>> -> :escape       # Ctrl+C
+      :eof -> :escape
+      char when is_binary(char) ->
+        # Accept printable characters
+        if String.printable?(char) and String.length(char) == 1 do
+          {:char, char}
+        else
+          :unknown
+        end
       _ -> :unknown
     end
   end
@@ -318,10 +491,6 @@ defmodule Esc.Select do
     IO.write("\r\e[J")
   end
 
-  # Helper functions
-  defp get_display_text({text, _value}) when is_binary(text), do: text
-  defp get_display_text(text) when is_binary(text), do: text
-
   defp get_return_value(%__MODULE__{items: items, selected_index: idx}) do
     case Enum.at(items, idx) do
       {_text, value} -> value
@@ -355,6 +524,20 @@ defmodule Esc.Select do
       {nil, true, theme} when not is_nil(theme) ->
         Esc.style()
         |> Esc.foreground(Esc.Theme.color(theme, :header))
+
+      _ ->
+        nil
+    end
+  end
+
+  defp get_effective_filter_style(select) do
+    case {select.filter_style, select.use_theme, Esc.get_theme()} do
+      {style, _, _} when not is_nil(style) ->
+        style
+
+      {nil, true, theme} when not is_nil(theme) ->
+        Esc.style()
+        |> Esc.foreground(Esc.Theme.color(theme, :muted))
 
       _ ->
         nil

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-01-02
+
+### Added
+
+- **Filter mode for all select components**: Press `/` to filter items interactively
+  - Available in Select, MultiSelect, SelectTable, and MultiSelectTable
+  - Case-insensitive substring matching by default
+  - Glob-style wildcards: `*.md` matches "readme.md", `red*` matches "redwood"
+  - Escape exits filter mode, second Escape clears filter, third cancels selection
+  - Match count shown when filtering (e.g., "5/10")
+  - New `Esc.Filter` module with reusable filtering logic
+- New `filter_style/2` function on all select components for styling the filter input
+
+### Changed
+
+- Select all (`a`) and deselect all (`n`) in MultiSelect/MultiSelectTable now only affect filtered items when a filter is active
+
 ## [0.5.0] - 2026-01-02
 
 ### Added
@@ -66,7 +83,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Table component**: Data tables with headers, custom borders, and column alignment
 - **Tree component**: Hierarchical tree rendering with connectors
 
-[Unreleased]: https://github.com/vectorfrog/esc/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/vectorfrog/esc/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/vectorfrog/esc/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/vectorfrog/esc/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/vectorfrog/esc/compare/v0.1.0...v0.4.0
 [0.1.0]: https://github.com/vectorfrog/esc/releases/tag/v0.1.0

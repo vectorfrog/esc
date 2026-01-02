@@ -24,11 +24,20 @@ defmodule Esc.MultiSelectTable do
   - `Right` / `l` / `Tab` - Move cursor right
   - `Space` - Toggle selection on current item
   - `Enter` - Confirm selections (if minimum met)
-  - `Escape` / `q` - Cancel selection
+  - `Escape` / `q` - Cancel selection (or exit filter mode)
   - `Home` / `g` - Jump to first item
   - `End` / `G` - Jump to last item
-  - `a` - Select all items
-  - `n` - Clear all selections
+  - `a` - Select all visible items (filtered items only when filtering)
+  - `n` - Clear selections on visible items (filtered items only when filtering)
+  - `/` - Enter filter mode
+
+  ## Filtering
+
+  Press `/` to enter filter mode and type to filter items. Supports glob-style
+  wildcards with `*` (e.g., `*.md`, `test*`, `*api*`).
+
+  When filtering is active, `a` and `n` only affect the displayed items.
+  Escape exits filter mode; press again to clear the filter.
 
   ## Theme Integration
 
@@ -49,7 +58,10 @@ defmodule Esc.MultiSelectTable do
             min_selections: 0,
             max_selections: nil,
             show_help: true,
-            help_style: nil
+            help_style: nil,
+            filter_mode: false,
+            filter_text: "",
+            filter_style: nil
 
   @type item :: String.t() | {String.t(), term()}
 
@@ -67,7 +79,10 @@ defmodule Esc.MultiSelectTable do
           min_selections: non_neg_integer(),
           max_selections: non_neg_integer() | nil,
           show_help: boolean(),
-          help_style: Esc.Style.t() | nil
+          help_style: Esc.Style.t() | nil,
+          filter_mode: boolean(),
+          filter_text: String.t(),
+          filter_style: Esc.Style.t() | nil
         }
 
   # Cursor adds [] around text = 2 chars, marker = 1 char, plus padding = 5 total extra
@@ -228,6 +243,14 @@ defmodule Esc.MultiSelectTable do
     %{table | use_theme: enabled}
   end
 
+  @doc """
+  Sets the style for the filter input line.
+  """
+  @spec filter_style(t(), Esc.Style.t()) :: t()
+  def filter_style(%__MODULE__{} = table, style) do
+    %{table | filter_style: style}
+  end
+
   # ===========================================================================
   # Rendering
   # ===========================================================================
@@ -239,16 +262,24 @@ defmodule Esc.MultiSelectTable do
   def render(%__MODULE__{items: []}), do: ""
 
   def render(%__MODULE__{} = table) do
-    {col_count, cell_width} = calculate_grid_dimensions(table)
+    # Get filtered items
+    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
+    filtered_items = Enum.map(filtered_indices, &Enum.at(table.items, &1))
+
+    # Calculate grid dimensions based on filtered items
+    {col_count, cell_width} = calculate_grid_dimensions_for_items(filtered_items, table)
     marker = table.selected_marker
     cursor_style = get_effective_cursor_style(table)
     selected_style = get_effective_selected_style(table)
     item_style = table.item_style
     border_style = get_effective_border_style(table)
 
+    # Find cursor position in filtered list
+    cursor_pos_in_filtered = Enum.find_index(filtered_indices, &(&1 == table.cursor_index))
+
     # Build grid rows with styled cells
     cell_rows =
-      table.items
+      filtered_items
       |> Enum.with_index()
       |> Enum.chunk_every(col_count)
       |> Enum.map(fn chunk ->
@@ -260,10 +291,12 @@ defmodule Esc.MultiSelectTable do
             # Empty cell
             String.duplicate(" ", cell_width)
 
-          {item, idx} ->
-            display_text = get_display_text(item)
-            is_focused = idx == table.cursor_index
-            is_selected = MapSet.member?(table.selected_indices, idx)
+          {item, pos_in_filtered} ->
+            # Get original index for selection check
+            original_idx = Enum.at(filtered_indices, pos_in_filtered)
+            display_text = Esc.Filter.get_display_text(item)
+            is_focused = pos_in_filtered == cursor_pos_in_filtered
+            is_selected = MapSet.member?(table.selected_indices, original_idx)
 
             # Build cell content with visual indicators
             content =
@@ -297,15 +330,36 @@ defmodule Esc.MultiSelectTable do
       end)
 
     # Use shared grid renderer
-    table_output = Esc.Grid.render(cell_rows, cell_width, table.border, border_style)
+    table_output =
+      if length(filtered_items) == 0 do
+        "(no matches)"
+      else
+        Esc.Grid.render(cell_rows, cell_width, table.border, border_style)
+      end
+
+    # Add filter input if filter is active or has text
+    output_with_filter =
+      if table.filter_mode or table.filter_text != "" do
+        filter_style = get_effective_filter_style(table)
+        filter_line = Esc.Filter.render_filter_input(
+          table.filter_text,
+          table.filter_mode,
+          prompt_style: filter_style,
+          match_count: {length(filtered_indices), length(table.items)},
+          count_style: filter_style
+        )
+        filter_line <> "\n\n" <> table_output
+      else
+        table_output
+      end
 
     if table.show_help do
       help_text = build_help_text(table)
       help_style = get_effective_help_style(table)
       styled_help = if help_style, do: Esc.render(help_style, help_text), else: help_text
-      table_output <> "\n" <> styled_help
+      output_with_filter <> "\n" <> styled_help
     else
-      table_output
+      output_with_filter
     end
   end
 
@@ -334,20 +388,20 @@ defmodule Esc.MultiSelectTable do
   # Private - Grid Calculation
   # ===========================================================================
 
-  defp calculate_grid_dimensions(%__MODULE__{items: []}), do: {1, 10}
+  defp calculate_grid_dimensions_for_items([], _table), do: {1, 10}
 
-  defp calculate_grid_dimensions(%__MODULE__{columns: cols, items: items}) when is_integer(cols) do
-    max_item_len = items |> Enum.map(&(get_display_text(&1) |> Esc.Grid.display_width())) |> Enum.max()
-    cell_width = max_item_len + @cursor_overhead
+  defp calculate_grid_dimensions_for_items(items, %__MODULE__{columns: cols}) when is_integer(cols) do
+    max_item_len = items |> Enum.map(&(Esc.Filter.get_display_text(&1) |> Esc.Grid.display_width())) |> Enum.max(fn -> 0 end)
+    cell_width = max(max_item_len + @cursor_overhead, 4)
     {cols, cell_width}
   end
 
-  defp calculate_grid_dimensions(%__MODULE__{columns: :auto, items: items, border: border}) do
+  defp calculate_grid_dimensions_for_items(items, %__MODULE__{columns: :auto, border: border}) do
     terminal_width = Esc.Table.get_terminal_width()
 
     # Use display_width for emoji/CJK support
-    max_item_len = items |> Enum.map(&(get_display_text(&1) |> Esc.Grid.display_width())) |> Enum.max()
-    cell_width = max_item_len + @cursor_overhead
+    max_item_len = items |> Enum.map(&(Esc.Filter.get_display_text(&1) |> Esc.Grid.display_width())) |> Enum.max(fn -> 0 end)
+    cell_width = max(max_item_len + @cursor_overhead, 4)
 
     # Calculate how many columns fit (with 2-char safety margin to prevent wrapping)
     col_count =
@@ -380,7 +434,19 @@ defmodule Esc.MultiSelectTable do
 
     IO.write(String.replace(output, "\n", "\r\n"))
 
-    {col_count, _} = calculate_grid_dimensions(table)
+    # Read input - behavior depends on filter mode
+    if table.filter_mode do
+      handle_filter_mode_input(table, line_count)
+    else
+      handle_normal_mode_input(table, line_count)
+    end
+  end
+
+  defp handle_normal_mode_input(table, line_count) do
+    # Get filtered items for navigation
+    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
+    filtered_items = Enum.map(filtered_indices, &Enum.at(table.items, &1))
+    {col_count, _} = calculate_grid_dimensions_for_items(filtered_items, table)
 
     case read_key() do
       :left ->
@@ -410,6 +476,9 @@ defmodule Esc.MultiSelectTable do
       :select_none ->
         move_and_redraw(table, line_count, &select_none/1)
 
+      :filter ->
+        move_and_redraw(table, line_count, &enter_filter_mode/1)
+
       :enter ->
         if can_submit?(table) do
           IO.write("\r\n")
@@ -419,11 +488,80 @@ defmodule Esc.MultiSelectTable do
         end
 
       :cancel ->
-        clear_lines(line_count)
-        :cancelled
+        if table.filter_text != "" do
+          move_and_redraw(table, line_count, &clear_filter/1)
+        else
+          clear_lines(line_count)
+          :cancelled
+        end
 
       _ ->
         move_and_redraw(table, line_count, & &1)
+    end
+  end
+
+  defp handle_filter_mode_input(table, line_count) do
+    case read_filter_key() do
+      :escape ->
+        if table.filter_text == "" do
+          clear_lines(line_count)
+          :cancelled
+        else
+          move_and_redraw(table, line_count, &exit_filter_mode/1)
+        end
+
+      :enter ->
+        move_and_redraw(table, line_count, &exit_filter_mode/1)
+
+      :backspace ->
+        move_and_redraw(table, line_count, &delete_filter_char/1)
+
+      :clear_line ->
+        move_and_redraw(table, line_count, fn t -> %{t | filter_text: ""} end)
+
+      {:char, char} ->
+        move_and_redraw(table, line_count, &add_filter_char(&1, char))
+
+      _ ->
+        move_and_redraw(table, line_count, & &1)
+    end
+  end
+
+  defp enter_filter_mode(table) do
+    %{table | filter_mode: true}
+  end
+
+  defp exit_filter_mode(table) do
+    table = %{table | filter_mode: false}
+    ensure_valid_cursor(table)
+  end
+
+  defp clear_filter(table) do
+    %{table | filter_text: "", cursor_index: 0}
+  end
+
+  defp add_filter_char(table, char) do
+    new_filter = table.filter_text <> char
+    table = %{table | filter_text: new_filter}
+    ensure_valid_cursor(table)
+  end
+
+  defp delete_filter_char(%{filter_text: ""} = table), do: table
+  defp delete_filter_char(table) do
+    new_filter = String.slice(table.filter_text, 0..-2//1)
+    %{table | filter_text: new_filter}
+  end
+
+  defp ensure_valid_cursor(table) do
+    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
+
+    if table.cursor_index in filtered_indices do
+      table
+    else
+      case filtered_indices do
+        [first | _] -> %{table | cursor_index: first}
+        [] -> table
+      end
     end
   end
 
@@ -433,43 +571,69 @@ defmodule Esc.MultiSelectTable do
   end
 
   defp move_left(table, _col_count) do
-    new_index = max(0, table.cursor_index - 1)
+    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
+    current_pos = Enum.find_index(filtered_indices, &(&1 == table.cursor_index)) || 0
+    new_pos = max(0, current_pos - 1)
+    new_index = Enum.at(filtered_indices, new_pos) || table.cursor_index
     %{table | cursor_index: new_index}
   end
 
   defp move_right(table, _col_count) do
-    max_index = length(table.items) - 1
-    new_index = min(max_index, table.cursor_index + 1)
+    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
+    current_pos = Enum.find_index(filtered_indices, &(&1 == table.cursor_index)) || 0
+    max_pos = length(filtered_indices) - 1
+    new_pos = min(max_pos, current_pos + 1)
+    new_index = Enum.at(filtered_indices, new_pos) || table.cursor_index
     %{table | cursor_index: new_index}
   end
 
   defp move_up(table, col_count) do
-    new_index = table.cursor_index - col_count
+    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
+    current_pos = Enum.find_index(filtered_indices, &(&1 == table.cursor_index)) || 0
+    new_pos = current_pos - col_count
 
-    if new_index >= 0 do
-      %{table | cursor_index: new_index}
-    else
-      row_count = ceil(length(table.items) / col_count)
-      current_col = rem(table.cursor_index, col_count)
-      wrapped_index = (row_count - 1) * col_count + current_col
-      %{table | cursor_index: min(wrapped_index, length(table.items) - 1)}
-    end
+    new_pos =
+      if new_pos >= 0 do
+        new_pos
+      else
+        row_count = ceil(length(filtered_indices) / col_count)
+        current_col = rem(current_pos, col_count)
+        wrapped_pos = (row_count - 1) * col_count + current_col
+        min(wrapped_pos, length(filtered_indices) - 1)
+      end
+
+    new_index = Enum.at(filtered_indices, new_pos) || table.cursor_index
+    %{table | cursor_index: new_index}
   end
 
   defp move_down(table, col_count) do
-    new_index = table.cursor_index + col_count
-    max_index = length(table.items) - 1
+    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
+    current_pos = Enum.find_index(filtered_indices, &(&1 == table.cursor_index)) || 0
+    new_pos = current_pos + col_count
+    max_pos = length(filtered_indices) - 1
 
-    if new_index <= max_index do
-      %{table | cursor_index: new_index}
-    else
-      current_col = rem(table.cursor_index, col_count)
-      %{table | cursor_index: current_col}
-    end
+    new_pos =
+      if new_pos <= max_pos do
+        new_pos
+      else
+        rem(current_pos, col_count)
+      end
+
+    new_index = Enum.at(filtered_indices, new_pos) || table.cursor_index
+    %{table | cursor_index: new_index}
   end
 
-  defp move_home(table), do: %{table | cursor_index: 0}
-  defp move_end(table), do: %{table | cursor_index: length(table.items) - 1}
+  defp move_home(table) do
+    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
+    new_index = List.first(filtered_indices) || 0
+    %{table | cursor_index: new_index}
+  end
+
+  defp move_end(table) do
+    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
+    new_index = List.last(filtered_indices) || length(table.items) - 1
+    %{table | cursor_index: new_index}
+  end
 
   defp toggle_selection(table) do
     idx = table.cursor_index
@@ -488,29 +652,30 @@ defmodule Esc.MultiSelectTable do
   end
 
   defp select_all(table) do
+    # Only select filtered/displayed items
+    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
     max = table.max_selections
-    count = length(table.items)
+    current = table.selected_indices
 
-    indices =
-      if is_nil(max) or max >= count do
-        0..(count - 1) |> MapSet.new()
-      else
-        current = table.selected_indices
-        remaining = max - MapSet.size(current)
+    # Calculate how many more we can select
+    can_add = if is_nil(max), do: length(filtered_indices), else: max - MapSet.size(current)
 
-        additional =
-          0..(count - 1)
-          |> Enum.reject(&MapSet.member?(current, &1))
-          |> Enum.take(remaining)
-          |> MapSet.new()
+    additional =
+      filtered_indices
+      |> Enum.reject(&MapSet.member?(current, &1))
+      |> Enum.take(max(0, can_add))
+      |> MapSet.new()
 
-        MapSet.union(current, additional)
-      end
-
-    %{table | selected_indices: indices}
+    %{table | selected_indices: MapSet.union(current, additional)}
   end
 
-  defp select_none(table), do: %{table | selected_indices: MapSet.new()}
+  defp select_none(table) do
+    # Only deselect filtered/displayed items
+    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
+    filtered_set = MapSet.new(filtered_indices)
+    remaining = MapSet.difference(table.selected_indices, filtered_set)
+    %{table | selected_indices: remaining}
+  end
 
   defp at_max_selections?(%__MODULE__{max_selections: nil}), do: false
 
@@ -532,6 +697,7 @@ defmodule Esc.MultiSelectTable do
       "\r" -> :enter
       "\n" -> :enter
       " " -> :toggle
+      "/" -> :filter
       "\t" -> :right
       "h" -> :left
       "j" -> :down
@@ -544,6 +710,26 @@ defmodule Esc.MultiSelectTable do
       "q" -> :cancel
       <<3>> -> :cancel
       :eof -> :cancel
+      _ -> :unknown
+    end
+  end
+
+  defp read_filter_key do
+    case read_char() do
+      "\e" -> :escape
+      "\r" -> :enter
+      "\n" -> :enter
+      <<127>> -> :backspace
+      <<8>> -> :backspace
+      <<21>> -> :clear_line
+      <<3>> -> :escape
+      :eof -> :escape
+      char when is_binary(char) ->
+        if String.printable?(char) and String.length(char) == 1 do
+          {:char, char}
+        else
+          :unknown
+        end
       _ -> :unknown
     end
   end
@@ -594,9 +780,6 @@ defmodule Esc.MultiSelectTable do
   # ===========================================================================
   # Private - Helpers
   # ===========================================================================
-
-  defp get_display_text({text, _value}) when is_binary(text), do: text
-  defp get_display_text(text) when is_binary(text), do: text
 
   defp get_return_value_for_item({_text, value}), do: value
   defp get_return_value_for_item(text) when is_binary(text), do: text
@@ -679,6 +862,19 @@ defmodule Esc.MultiSelectTable do
 
   defp get_effective_help_style(table) do
     case {table.help_style, table.use_theme, Esc.get_theme()} do
+      {style, _, _} when not is_nil(style) ->
+        style
+
+      {nil, true, theme} when not is_nil(theme) ->
+        Esc.style() |> Esc.foreground(Esc.Theme.color(theme, :muted))
+
+      _ ->
+        nil
+    end
+  end
+
+  defp get_effective_filter_style(table) do
+    case {table.filter_style, table.use_theme, Esc.get_theme()} do
       {style, _, _} when not is_nil(style) ->
         style
 

@@ -32,11 +32,20 @@ defmodule Esc.MultiSelect do
   - `Down` / `j` - Move cursor down
   - `Space` - Toggle selection on current item
   - `Enter` - Confirm selections (if minimum met)
-  - `Escape` / `q` - Cancel selection
+  - `Escape` / `q` - Cancel selection (or exit filter mode)
   - `Home` / `g` - Jump to first item
   - `End` / `G` - Jump to last item
-  - `a` - Select all items
-  - `n` - Clear all selections
+  - `a` - Select all visible items (filtered items only when filtering)
+  - `n` - Clear selections on visible items (filtered items only when filtering)
+  - `/` - Enter filter mode
+
+  ## Filtering
+
+  Press `/` to enter filter mode and type to filter items. Supports glob-style
+  wildcards with `*` (e.g., `*.md`, `test*`, `*api*`).
+
+  When filtering is active, `a` and `n` only affect the displayed items.
+  Escape exits filter mode; press again to clear the filter.
 
   ## Theme Integration
 
@@ -68,7 +77,10 @@ defmodule Esc.MultiSelect do
             min_selections: 0,
             max_selections: nil,
             show_help: true,
-            help_style: nil
+            help_style: nil,
+            filter_mode: false,
+            filter_text: "",
+            filter_style: nil
 
   @type item :: String.t() | {String.t(), term()}
 
@@ -89,7 +101,10 @@ defmodule Esc.MultiSelect do
           min_selections: non_neg_integer(),
           max_selections: non_neg_integer() | nil,
           show_help: boolean(),
-          help_style: Esc.Style.t() | nil
+          help_style: Esc.Style.t() | nil,
+          filter_mode: boolean(),
+          filter_text: String.t(),
+          filter_style: Esc.Style.t() | nil
         }
 
   # ===========================================================================
@@ -322,6 +337,14 @@ defmodule Esc.MultiSelect do
     %{multi_select | use_theme: enabled}
   end
 
+  @doc """
+  Sets the style for the filter input line.
+  """
+  @spec filter_style(t(), Esc.Style.t()) :: t()
+  def filter_style(%__MODULE__{} = multi_select, style) do
+    %{multi_select | filter_style: style}
+  end
+
   # ===========================================================================
   # Rendering
   # ===========================================================================
@@ -345,11 +368,14 @@ defmodule Esc.MultiSelect do
     unselected_marker_style = get_effective_unselected_marker_style(multi_select)
     selected_item_style = get_effective_selected_item_style(multi_select)
 
+    # Get filtered items with their original indices
+    filtered_indices = Esc.Filter.matching_indices(multi_select.items, multi_select.filter_text)
+
     items_output =
-      multi_select.items
-      |> Enum.with_index()
-      |> Enum.map(fn {item, idx} ->
-        display_text = get_display_text(item)
+      filtered_indices
+      |> Enum.map(fn idx ->
+        item = Enum.at(multi_select.items, idx)
+        display_text = Esc.Filter.get_display_text(item)
         is_focused = idx == multi_select.cursor_index
         is_selected = MapSet.member?(multi_select.selected_indices, idx)
 
@@ -383,13 +409,29 @@ defmodule Esc.MultiSelect do
       end)
       |> Enum.join("\n")
 
+    # Add filter input if filter is active or has text
+    output_with_filter =
+      if multi_select.filter_mode or multi_select.filter_text != "" do
+        filter_style = get_effective_filter_style(multi_select)
+        filter_line = Esc.Filter.render_filter_input(
+          multi_select.filter_text,
+          multi_select.filter_mode,
+          prompt_style: filter_style,
+          match_count: {length(filtered_indices), length(multi_select.items)},
+          count_style: filter_style
+        )
+        filter_line <> "\n\n" <> items_output
+      else
+        items_output
+      end
+
     if multi_select.show_help do
       help_text = build_help_text(multi_select)
       help_style = get_effective_help_style(multi_select)
       styled_help = apply_style(help_text, help_style)
-      items_output <> "\n\n" <> styled_help
+      output_with_filter <> "\n\n" <> styled_help
     else
-      items_output
+      output_with_filter
     end
   end
 
@@ -433,7 +475,15 @@ defmodule Esc.MultiSelect do
     # In raw mode, \n doesn't return to column 0, so use \r\n
     IO.write(String.replace(output, "\n", "\r\n"))
 
-    # Read input
+    # Read input - behavior depends on filter mode
+    if multi_select.filter_mode do
+      handle_filter_mode_input(multi_select, line_count)
+    else
+      handle_normal_mode_input(multi_select, line_count)
+    end
+  end
+
+  defp handle_normal_mode_input(multi_select, line_count) do
     case read_key() do
       :up ->
         move_and_redraw(multi_select, line_count, &move_up/1)
@@ -456,21 +506,92 @@ defmodule Esc.MultiSelect do
       :select_none ->
         move_and_redraw(multi_select, line_count, &select_none/1)
 
+      :filter ->
+        move_and_redraw(multi_select, line_count, &enter_filter_mode/1)
+
       :enter ->
         if can_submit?(multi_select) do
           IO.write("\r\n")
           {:ok, get_selected_values(multi_select)}
         else
-          # Can't submit yet, redraw
           move_and_redraw(multi_select, line_count, & &1)
         end
 
       :cancel ->
-        clear_lines(line_count)
-        :cancelled
+        if multi_select.filter_text != "" do
+          move_and_redraw(multi_select, line_count, &clear_filter/1)
+        else
+          clear_lines(line_count)
+          :cancelled
+        end
 
       _ ->
         move_and_redraw(multi_select, line_count, & &1)
+    end
+  end
+
+  defp handle_filter_mode_input(multi_select, line_count) do
+    case read_filter_key() do
+      :escape ->
+        if multi_select.filter_text == "" do
+          clear_lines(line_count)
+          :cancelled
+        else
+          move_and_redraw(multi_select, line_count, &exit_filter_mode/1)
+        end
+
+      :enter ->
+        move_and_redraw(multi_select, line_count, &exit_filter_mode/1)
+
+      :backspace ->
+        move_and_redraw(multi_select, line_count, &delete_filter_char/1)
+
+      :clear_line ->
+        move_and_redraw(multi_select, line_count, fn s -> %{s | filter_text: ""} end)
+
+      {:char, char} ->
+        move_and_redraw(multi_select, line_count, &add_filter_char(&1, char))
+
+      _ ->
+        move_and_redraw(multi_select, line_count, & &1)
+    end
+  end
+
+  defp enter_filter_mode(multi_select) do
+    %{multi_select | filter_mode: true}
+  end
+
+  defp exit_filter_mode(multi_select) do
+    multi_select = %{multi_select | filter_mode: false}
+    ensure_valid_cursor(multi_select)
+  end
+
+  defp clear_filter(multi_select) do
+    %{multi_select | filter_text: "", cursor_index: 0}
+  end
+
+  defp add_filter_char(multi_select, char) do
+    new_filter = multi_select.filter_text <> char
+    multi_select = %{multi_select | filter_text: new_filter}
+    ensure_valid_cursor(multi_select)
+  end
+
+  defp delete_filter_char(%{filter_text: ""} = multi_select), do: multi_select
+  defp delete_filter_char(multi_select) do
+    new_filter = String.slice(multi_select.filter_text, 0..-2//1)
+    %{multi_select | filter_text: new_filter}
+  end
+
+  defp ensure_valid_cursor(multi_select) do
+    filtered_indices = Esc.Filter.matching_indices(multi_select.items, multi_select.filter_text)
+
+    if multi_select.cursor_index in filtered_indices do
+      multi_select
+    else
+      case filtered_indices do
+        [first | _] -> %{multi_select | cursor_index: first}
+        [] -> multi_select
+      end
     end
   end
 
@@ -480,23 +601,31 @@ defmodule Esc.MultiSelect do
   end
 
   defp move_up(%__MODULE__{} = multi_select) do
-    count = length(multi_select.items)
-    new_index = if multi_select.cursor_index == 0, do: count - 1, else: multi_select.cursor_index - 1
+    filtered_indices = Esc.Filter.matching_indices(multi_select.items, multi_select.filter_text)
+    current_pos = Enum.find_index(filtered_indices, &(&1 == multi_select.cursor_index)) || 0
+    new_pos = if current_pos == 0, do: length(filtered_indices) - 1, else: current_pos - 1
+    new_index = Enum.at(filtered_indices, new_pos) || multi_select.cursor_index
     %{multi_select | cursor_index: new_index}
   end
 
   defp move_down(%__MODULE__{} = multi_select) do
-    count = length(multi_select.items)
-    new_index = if multi_select.cursor_index == count - 1, do: 0, else: multi_select.cursor_index + 1
+    filtered_indices = Esc.Filter.matching_indices(multi_select.items, multi_select.filter_text)
+    current_pos = Enum.find_index(filtered_indices, &(&1 == multi_select.cursor_index)) || 0
+    new_pos = if current_pos == length(filtered_indices) - 1, do: 0, else: current_pos + 1
+    new_index = Enum.at(filtered_indices, new_pos) || multi_select.cursor_index
     %{multi_select | cursor_index: new_index}
   end
 
   defp move_home(%__MODULE__{} = multi_select) do
-    %{multi_select | cursor_index: 0}
+    filtered_indices = Esc.Filter.matching_indices(multi_select.items, multi_select.filter_text)
+    new_index = List.first(filtered_indices) || 0
+    %{multi_select | cursor_index: new_index}
   end
 
   defp move_end(%__MODULE__{} = multi_select) do
-    %{multi_select | cursor_index: length(multi_select.items) - 1}
+    filtered_indices = Esc.Filter.matching_indices(multi_select.items, multi_select.filter_text)
+    new_index = List.last(filtered_indices) || length(multi_select.items) - 1
+    %{multi_select | cursor_index: new_index}
   end
 
   defp toggle_selection(%__MODULE__{} = multi_select) do
@@ -519,31 +648,29 @@ defmodule Esc.MultiSelect do
   end
 
   defp select_all(%__MODULE__{} = multi_select) do
+    # Only select filtered/displayed items
+    filtered_indices = Esc.Filter.matching_indices(multi_select.items, multi_select.filter_text)
     max = multi_select.max_selections
-    count = length(multi_select.items)
+    current = multi_select.selected_indices
 
-    indices =
-      if is_nil(max) or max >= count do
-        0..(count - 1) |> MapSet.new()
-      else
-        # Select up to max, prioritizing currently selected + filling from start
-        current = multi_select.selected_indices
-        remaining = max - MapSet.size(current)
+    # Calculate how many more we can select
+    can_add = if is_nil(max), do: length(filtered_indices), else: max - MapSet.size(current)
 
-        additional =
-          0..(count - 1)
-          |> Enum.reject(&MapSet.member?(current, &1))
-          |> Enum.take(remaining)
-          |> MapSet.new()
+    additional =
+      filtered_indices
+      |> Enum.reject(&MapSet.member?(current, &1))
+      |> Enum.take(max(0, can_add))
+      |> MapSet.new()
 
-        MapSet.union(current, additional)
-      end
-
-    %{multi_select | selected_indices: indices}
+    %{multi_select | selected_indices: MapSet.union(current, additional)}
   end
 
   defp select_none(%__MODULE__{} = multi_select) do
-    %{multi_select | selected_indices: MapSet.new()}
+    # Only deselect filtered/displayed items
+    filtered_indices = Esc.Filter.matching_indices(multi_select.items, multi_select.filter_text)
+    filtered_set = MapSet.new(filtered_indices)
+    remaining = MapSet.difference(multi_select.selected_indices, filtered_set)
+    %{multi_select | selected_indices: remaining}
   end
 
   defp at_max_selections?(%__MODULE__{max_selections: nil}), do: false
@@ -566,6 +693,7 @@ defmodule Esc.MultiSelect do
       "\r" -> :enter
       "\n" -> :enter
       " " -> :toggle
+      "/" -> :filter
       "j" -> :down
       "k" -> :up
       "g" -> :home
@@ -575,6 +703,26 @@ defmodule Esc.MultiSelect do
       "q" -> :cancel
       <<3>> -> :cancel
       :eof -> :cancel
+      _ -> :unknown
+    end
+  end
+
+  defp read_filter_key do
+    case read_char() do
+      "\e" -> :escape
+      "\r" -> :enter
+      "\n" -> :enter
+      <<127>> -> :backspace
+      <<8>> -> :backspace
+      <<21>> -> :clear_line
+      <<3>> -> :escape
+      :eof -> :escape
+      char when is_binary(char) ->
+        if String.printable?(char) and String.length(char) == 1 do
+          {:char, char}
+        else
+          :unknown
+        end
       _ -> :unknown
     end
   end
@@ -627,9 +775,6 @@ defmodule Esc.MultiSelect do
   # ===========================================================================
   # Private - Helpers
   # ===========================================================================
-
-  defp get_display_text({text, _value}) when is_binary(text), do: text
-  defp get_display_text(text) when is_binary(text), do: text
 
   defp get_return_value_for_item({_text, value}), do: value
   defp get_return_value_for_item(text) when is_binary(text), do: text
@@ -742,6 +887,19 @@ defmodule Esc.MultiSelect do
 
   defp get_effective_help_style(multi_select) do
     case {multi_select.help_style, multi_select.use_theme, Esc.get_theme()} do
+      {style, _, _} when not is_nil(style) ->
+        style
+
+      {nil, true, theme} when not is_nil(theme) ->
+        Esc.style() |> Esc.foreground(Esc.Theme.color(theme, :muted))
+
+      _ ->
+        nil
+    end
+  end
+
+  defp get_effective_filter_style(multi_select) do
+    case {multi_select.filter_style, multi_select.use_theme, Esc.get_theme()} do
       {style, _, _} when not is_nil(style) ->
         style
 

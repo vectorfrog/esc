@@ -45,7 +45,7 @@ Add `esc` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:esc, "~> 0.1.0"}
+    {:esc, "~> 0.4.0"}
   ]
 end
 ```

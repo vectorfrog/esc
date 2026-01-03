@@ -38,6 +38,8 @@ defmodule Esc.MultiSelect do
   - `a` - Select all visible items (filtered items only when filtering)
   - `n` - Clear selections on visible items (filtered items only when filtering)
   - `/` - Enter filter mode
+  - `Ctrl+F` / `]` - Next page
+  - `Ctrl+B` / `[` - Previous page
 
   ## Filtering
 
@@ -61,6 +63,8 @@ defmodule Esc.MultiSelect do
   Explicit styles override theme colors. Use `use_theme(multi_select, false)` to disable.
   """
 
+  @default_page_size 100
+
   defstruct items: [],
             cursor_index: 0,
             selected_indices: MapSet.new(),
@@ -80,7 +84,9 @@ defmodule Esc.MultiSelect do
             help_style: nil,
             filter_mode: false,
             filter_text: "",
-            filter_style: nil
+            filter_style: nil,
+            page_size: @default_page_size,
+            current_page: 0
 
   @type item :: String.t() | {String.t(), term()}
 
@@ -104,7 +110,9 @@ defmodule Esc.MultiSelect do
           help_style: Esc.Style.t() | nil,
           filter_mode: boolean(),
           filter_text: String.t(),
-          filter_style: Esc.Style.t() | nil
+          filter_style: Esc.Style.t() | nil,
+          page_size: non_neg_integer() | nil,
+          current_page: non_neg_integer()
         }
 
   # ===========================================================================
@@ -345,6 +353,16 @@ defmodule Esc.MultiSelect do
     %{multi_select | filter_style: style}
   end
 
+  @doc """
+  Sets the number of items displayed per page.
+
+  Default is 100 items per page. Set to 0 or nil to disable pagination.
+  """
+  @spec page_size(t(), non_neg_integer() | nil) :: t()
+  def page_size(%__MODULE__{} = multi_select, size) when is_nil(size) or size >= 0 do
+    %{multi_select | page_size: size}
+  end
+
   # ===========================================================================
   # Rendering
   # ===========================================================================
@@ -367,12 +385,15 @@ defmodule Esc.MultiSelect do
     selected_marker_style = get_effective_selected_marker_style(multi_select)
     unselected_marker_style = get_effective_unselected_marker_style(multi_select)
     selected_item_style = get_effective_selected_item_style(multi_select)
+    filter_style = get_effective_filter_style(multi_select)
 
-    # Get filtered items with their original indices
+    # Get filtered items then paginate
     filtered_indices = Esc.Filter.matching_indices(multi_select.items, multi_select.filter_text)
+    page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, multi_select.current_page)
+    total_pages = Esc.Filter.total_pages(multi_select.items, multi_select.filter_text, multi_select.page_size)
 
     items_output =
-      filtered_indices
+      page_indices
       |> Enum.map(fn idx ->
         item = Enum.at(multi_select.items, idx)
         display_text = Esc.Filter.get_display_text(item)
@@ -409,10 +430,11 @@ defmodule Esc.MultiSelect do
       end)
       |> Enum.join("\n")
 
-    # Add filter input if filter is active or has text
-    output_with_filter =
+    # Build header line with filter and/or pagination
+    header_parts = []
+
+    header_parts =
       if multi_select.filter_mode or multi_select.filter_text != "" do
-        filter_style = get_effective_filter_style(multi_select)
         filter_line = Esc.Filter.render_filter_input(
           multi_select.filter_text,
           multi_select.filter_mode,
@@ -420,18 +442,32 @@ defmodule Esc.MultiSelect do
           match_count: {length(filtered_indices), length(multi_select.items)},
           count_style: filter_style
         )
-        filter_line <> "\n\n" <> items_output
+        header_parts ++ [filter_line]
       else
-        items_output
+        header_parts
+      end
+
+    header_parts =
+      if total_pages > 1 do
+        pagination = Esc.Filter.render_pagination(multi_select.current_page, total_pages, style: filter_style)
+        header_parts ++ [pagination]
+      else
+        header_parts
+      end
+
+    output_with_header =
+      case header_parts do
+        [] -> items_output
+        parts -> Enum.join(parts, " ") <> "\n\n" <> items_output
       end
 
     if multi_select.show_help do
       help_text = build_help_text(multi_select)
       help_style = get_effective_help_style(multi_select)
       styled_help = apply_style(help_text, help_style)
-      output_with_filter <> "\n\n" <> styled_help
+      output_with_header <> "\n\n" <> styled_help
     else
-      output_with_filter
+      output_with_header
     end
   end
 
@@ -496,6 +532,12 @@ defmodule Esc.MultiSelect do
 
       :end_key ->
         move_and_redraw(multi_select, line_count, &move_end/1)
+
+      :page_forward ->
+        move_and_redraw(multi_select, line_count, &next_page/1)
+
+      :page_backward ->
+        move_and_redraw(multi_select, line_count, &prev_page/1)
 
       :toggle ->
         move_and_redraw(multi_select, line_count, &toggle_selection/1)
@@ -567,12 +609,12 @@ defmodule Esc.MultiSelect do
   end
 
   defp clear_filter(multi_select) do
-    %{multi_select | filter_text: "", cursor_index: 0}
+    %{multi_select | filter_text: "", cursor_index: 0, current_page: 0}
   end
 
   defp add_filter_char(multi_select, char) do
     new_filter = multi_select.filter_text <> char
-    multi_select = %{multi_select | filter_text: new_filter}
+    multi_select = %{multi_select | filter_text: new_filter, current_page: 0}
     ensure_valid_cursor(multi_select)
   end
 
@@ -601,31 +643,72 @@ defmodule Esc.MultiSelect do
   end
 
   defp move_up(%__MODULE__{} = multi_select) do
-    filtered_indices = Esc.Filter.matching_indices(multi_select.items, multi_select.filter_text)
-    current_pos = Enum.find_index(filtered_indices, &(&1 == multi_select.cursor_index)) || 0
-    new_pos = if current_pos == 0, do: length(filtered_indices) - 1, else: current_pos - 1
-    new_index = Enum.at(filtered_indices, new_pos) || multi_select.cursor_index
-    %{multi_select | cursor_index: new_index}
+    page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, multi_select.current_page)
+    current_pos = Enum.find_index(page_indices, &(&1 == multi_select.cursor_index)) || 0
+
+    if current_pos == 0 do
+      total_pages = Esc.Filter.total_pages(multi_select.items, multi_select.filter_text, multi_select.page_size)
+      new_page = if multi_select.current_page == 0, do: total_pages - 1, else: multi_select.current_page - 1
+      new_page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, new_page)
+      new_index = List.last(new_page_indices) || multi_select.cursor_index
+      %{multi_select | cursor_index: new_index, current_page: new_page}
+    else
+      new_index = Enum.at(page_indices, current_pos - 1) || multi_select.cursor_index
+      %{multi_select | cursor_index: new_index}
+    end
   end
 
   defp move_down(%__MODULE__{} = multi_select) do
-    filtered_indices = Esc.Filter.matching_indices(multi_select.items, multi_select.filter_text)
-    current_pos = Enum.find_index(filtered_indices, &(&1 == multi_select.cursor_index)) || 0
-    new_pos = if current_pos == length(filtered_indices) - 1, do: 0, else: current_pos + 1
-    new_index = Enum.at(filtered_indices, new_pos) || multi_select.cursor_index
-    %{multi_select | cursor_index: new_index}
+    page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, multi_select.current_page)
+    current_pos = Enum.find_index(page_indices, &(&1 == multi_select.cursor_index)) || 0
+
+    if current_pos == length(page_indices) - 1 do
+      total_pages = Esc.Filter.total_pages(multi_select.items, multi_select.filter_text, multi_select.page_size)
+      new_page = if multi_select.current_page == total_pages - 1, do: 0, else: multi_select.current_page + 1
+      new_page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, new_page)
+      new_index = List.first(new_page_indices) || multi_select.cursor_index
+      %{multi_select | cursor_index: new_index, current_page: new_page}
+    else
+      new_index = Enum.at(page_indices, current_pos + 1) || multi_select.cursor_index
+      %{multi_select | cursor_index: new_index}
+    end
   end
 
   defp move_home(%__MODULE__{} = multi_select) do
-    filtered_indices = Esc.Filter.matching_indices(multi_select.items, multi_select.filter_text)
-    new_index = List.first(filtered_indices) || 0
-    %{multi_select | cursor_index: new_index}
+    page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, 0)
+    new_index = List.first(page_indices) || 0
+    %{multi_select | cursor_index: new_index, current_page: 0}
   end
 
   defp move_end(%__MODULE__{} = multi_select) do
-    filtered_indices = Esc.Filter.matching_indices(multi_select.items, multi_select.filter_text)
-    new_index = List.last(filtered_indices) || length(multi_select.items) - 1
-    %{multi_select | cursor_index: new_index}
+    total_pages = Esc.Filter.total_pages(multi_select.items, multi_select.filter_text, multi_select.page_size)
+    last_page = total_pages - 1
+    page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, last_page)
+    new_index = List.last(page_indices) || length(multi_select.items) - 1
+    %{multi_select | cursor_index: new_index, current_page: last_page}
+  end
+
+  defp next_page(%__MODULE__{} = multi_select) do
+    total_pages = Esc.Filter.total_pages(multi_select.items, multi_select.filter_text, multi_select.page_size)
+    if multi_select.current_page < total_pages - 1 do
+      new_page = multi_select.current_page + 1
+      page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, new_page)
+      new_index = List.first(page_indices) || multi_select.cursor_index
+      %{multi_select | current_page: new_page, cursor_index: new_index}
+    else
+      multi_select
+    end
+  end
+
+  defp prev_page(%__MODULE__{} = multi_select) do
+    if multi_select.current_page > 0 do
+      new_page = multi_select.current_page - 1
+      page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, new_page)
+      new_index = List.first(page_indices) || multi_select.cursor_index
+      %{multi_select | current_page: new_page, cursor_index: new_index}
+    else
+      multi_select
+    end
   end
 
   defp toggle_selection(%__MODULE__{} = multi_select) do
@@ -698,6 +781,10 @@ defmodule Esc.MultiSelect do
       "k" -> :up
       "g" -> :home
       "G" -> :end_key
+      "]" -> :page_forward
+      "[" -> :page_backward
+      <<6>> -> :page_forward   # Ctrl+F
+      <<2>> -> :page_backward  # Ctrl+B
       "a" -> :select_all
       "n" -> :select_none
       "q" -> :cancel

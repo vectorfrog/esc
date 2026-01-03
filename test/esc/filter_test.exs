@@ -265,4 +265,111 @@ defmodule Esc.FilterTest do
       assert Filter.get_display_text({"", :value}) == ""
     end
   end
+
+  describe "page_indices/4" do
+    test "returns all indices when page_size is 0" do
+      items = ["a", "b", "c", "d", "e"]
+      assert Filter.page_indices(items, "", 0, 0) == [0, 1, 2, 3, 4]
+    end
+
+    test "returns all indices when page_size is nil" do
+      items = ["a", "b", "c", "d", "e"]
+      assert Filter.page_indices(items, "", nil, 0) == [0, 1, 2, 3, 4]
+    end
+
+    test "returns first page of indices" do
+      items = ["a", "b", "c", "d", "e"]
+      assert Filter.page_indices(items, "", 2, 0) == [0, 1]
+    end
+
+    test "returns second page of indices" do
+      items = ["a", "b", "c", "d", "e"]
+      assert Filter.page_indices(items, "", 2, 1) == [2, 3]
+    end
+
+    test "returns partial last page" do
+      items = ["a", "b", "c", "d", "e"]
+      assert Filter.page_indices(items, "", 2, 2) == [4]
+    end
+
+    test "works with filtered items" do
+      items = ["apple", "banana", "apricot", "cherry", "avocado"]
+      # Filtered indices for "a*" = [0, 2, 4] (apple, apricot, avocado)
+      assert Filter.page_indices(items, "a*", 2, 0) == [0, 2]
+      assert Filter.page_indices(items, "a*", 2, 1) == [4]
+    end
+
+    test "returns empty list for out of bounds page" do
+      items = ["a", "b", "c"]
+      assert Filter.page_indices(items, "", 2, 5) == []
+    end
+  end
+
+  describe "total_pages/3" do
+    test "returns 1 when page_size is 0" do
+      items = ["a", "b", "c", "d", "e"]
+      assert Filter.total_pages(items, "", 0) == 1
+    end
+
+    test "returns 1 when page_size is nil" do
+      items = ["a", "b", "c", "d", "e"]
+      assert Filter.total_pages(items, "", nil) == 1
+    end
+
+    test "returns correct page count" do
+      items = ["a", "b", "c", "d", "e"]
+      assert Filter.total_pages(items, "", 2) == 3
+      assert Filter.total_pages(items, "", 3) == 2
+      assert Filter.total_pages(items, "", 5) == 1
+      assert Filter.total_pages(items, "", 10) == 1
+    end
+
+    test "works with filtered items" do
+      items = ["apple", "banana", "apricot", "cherry", "avocado"]
+      # Filtered count for "a*" = 3 (apple, apricot, avocado)
+      assert Filter.total_pages(items, "a*", 2) == 2
+    end
+
+    test "returns 1 for empty items" do
+      assert Filter.total_pages([], "", 10) == 1
+    end
+  end
+
+  describe "clamp_page/4" do
+    test "returns same page when valid" do
+      items = ["a", "b", "c", "d", "e"]
+      assert Filter.clamp_page(1, items, "", 2) == 1
+    end
+
+    test "clamps to last page when too high" do
+      items = ["a", "b", "c", "d", "e"]
+      assert Filter.clamp_page(10, items, "", 2) == 2
+    end
+
+    test "clamps to 0 when negative" do
+      items = ["a", "b", "c"]
+      assert Filter.clamp_page(-1, items, "", 2) == 0
+    end
+  end
+
+  describe "render_pagination/3" do
+    test "returns empty string for single page" do
+      assert Filter.render_pagination(0, 1, []) == ""
+    end
+
+    test "renders page indicator" do
+      result = Filter.render_pagination(0, 5, [])
+      assert result == "[Page 1/5]"
+    end
+
+    test "renders correct page number (1-indexed)" do
+      assert Filter.render_pagination(2, 5, []) == "[Page 3/5]"
+    end
+
+    test "applies style" do
+      style = Esc.style() |> Esc.foreground(:cyan)
+      result = Filter.render_pagination(0, 5, style: style)
+      assert result =~ "\e[36m"  # cyan color code
+    end
+  end
 end

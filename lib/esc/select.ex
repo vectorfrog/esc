@@ -34,6 +34,8 @@ defmodule Esc.Select do
   - `Home` / `g` - Jump to first item
   - `End` / `G` - Jump to last item
   - `/` - Enter filter mode
+  - `Ctrl+F` / `]` - Next page
+  - `Ctrl+B` / `[` - Previous page
 
   ## Filtering
 
@@ -63,6 +65,8 @@ defmodule Esc.Select do
   Explicit styles override theme colors. Use `use_theme(select, false)` to disable.
   """
 
+  @default_page_size 100
+
   defstruct items: [],
             selected_index: 0,
             cursor: "> ",
@@ -72,7 +76,9 @@ defmodule Esc.Select do
             use_theme: true,
             filter_mode: false,
             filter_text: "",
-            filter_style: nil
+            filter_style: nil,
+            page_size: @default_page_size,
+            current_page: 0
 
   @type item :: String.t() | {String.t(), term()}
 
@@ -86,7 +92,9 @@ defmodule Esc.Select do
           use_theme: boolean(),
           filter_mode: boolean(),
           filter_text: String.t(),
-          filter_style: Esc.Style.t() | nil
+          filter_style: Esc.Style.t() | nil,
+          page_size: non_neg_integer() | nil,
+          current_page: non_neg_integer()
         }
 
   @doc """
@@ -164,6 +172,25 @@ defmodule Esc.Select do
   end
 
   @doc """
+  Sets the number of items displayed per page.
+
+  Default is 100 items per page. Set to 0 or nil to disable pagination
+  and show all items.
+
+  ## Examples
+
+      # Custom page size
+      Select.new(items) |> Select.page_size(25)
+
+      # Disable pagination
+      Select.new(items) |> Select.page_size(0)
+  """
+  @spec page_size(t(), non_neg_integer() | nil) :: t()
+  def page_size(%__MODULE__{} = select, size) when is_nil(size) or size >= 0 do
+    %{select | page_size: size}
+  end
+
+  @doc """
   Renders the select list at its current state (non-interactive).
 
   This is useful for previewing the select or for testing.
@@ -177,12 +204,15 @@ defmodule Esc.Select do
 
     cursor_style = get_effective_cursor_style(select)
     selected_style = get_effective_selected_style(select)
+    filter_style = get_effective_filter_style(select)
 
-    # Get filtered items with their original indices
+    # Get filtered items then paginate
     filtered_indices = Esc.Filter.matching_indices(select.items, select.filter_text)
+    page_indices = Esc.Filter.page_indices(select.items, select.filter_text, select.page_size, select.current_page)
+    total_pages = Esc.Filter.total_pages(select.items, select.filter_text, select.page_size)
 
     items_output =
-      filtered_indices
+      page_indices
       |> Enum.map(fn idx ->
         item = Enum.at(select.items, idx)
         display_text = Esc.Filter.get_display_text(item)
@@ -199,19 +229,34 @@ defmodule Esc.Select do
       end)
       |> Enum.join("\n")
 
-    # Add filter input if filter is active or has text
-    if select.filter_mode or select.filter_text != "" do
-      filter_style = get_effective_filter_style(select)
-      filter_line = Esc.Filter.render_filter_input(
-        select.filter_text,
-        select.filter_mode,
-        prompt_style: filter_style,
-        match_count: {length(filtered_indices), length(select.items)},
-        count_style: filter_style
-      )
-      filter_line <> "\n\n" <> items_output
-    else
-      items_output
+    # Build header line with filter and/or pagination
+    header_parts = []
+
+    header_parts =
+      if select.filter_mode or select.filter_text != "" do
+        filter_line = Esc.Filter.render_filter_input(
+          select.filter_text,
+          select.filter_mode,
+          prompt_style: filter_style,
+          match_count: {length(filtered_indices), length(select.items)},
+          count_style: filter_style
+        )
+        header_parts ++ [filter_line]
+      else
+        header_parts
+      end
+
+    header_parts =
+      if total_pages > 1 do
+        pagination = Esc.Filter.render_pagination(select.current_page, total_pages, style: filter_style)
+        header_parts ++ [pagination]
+      else
+        header_parts
+      end
+
+    case header_parts do
+      [] -> items_output
+      parts -> Enum.join(parts, " ") <> "\n\n" <> items_output
     end
   end
 
@@ -275,10 +320,16 @@ defmodule Esc.Select do
       :end_key ->
         move_and_redraw(select, line_count, &move_end/1)
 
+      :page_forward ->
+        move_and_redraw(select, line_count, &next_page/1)
+
+      :page_backward ->
+        move_and_redraw(select, line_count, &prev_page/1)
+
       :enter ->
         # Make sure cursor is on a valid filtered item
-        filtered_indices = Esc.Filter.matching_indices(select.items, select.filter_text)
-        if select.selected_index in filtered_indices do
+        page_indices = Esc.Filter.page_indices(select.items, select.filter_text, select.page_size, select.current_page)
+        if select.selected_index in page_indices do
           IO.write("\r\n")
           {:ok, get_return_value(select)}
         else
@@ -342,12 +393,12 @@ defmodule Esc.Select do
   end
 
   defp clear_filter(select) do
-    %{select | filter_text: "", selected_index: 0}
+    %{select | filter_text: "", selected_index: 0, current_page: 0}
   end
 
   defp add_filter_char(select, char) do
     new_filter = select.filter_text <> char
-    select = %{select | filter_text: new_filter}
+    select = %{select | filter_text: new_filter, current_page: 0}
     ensure_valid_cursor(select)
   end
 
@@ -377,31 +428,76 @@ defmodule Esc.Select do
   end
 
   defp move_up(%__MODULE__{} = select) do
-    filtered_indices = Esc.Filter.matching_indices(select.items, select.filter_text)
-    current_pos = Enum.find_index(filtered_indices, &(&1 == select.selected_index)) || 0
-    new_pos = if current_pos == 0, do: length(filtered_indices) - 1, else: current_pos - 1
-    new_index = Enum.at(filtered_indices, new_pos) || select.selected_index
-    %{select | selected_index: new_index}
+    page_indices = Esc.Filter.page_indices(select.items, select.filter_text, select.page_size, select.current_page)
+    current_pos = Enum.find_index(page_indices, &(&1 == select.selected_index)) || 0
+
+    if current_pos == 0 do
+      # At top of page - go to previous page or wrap to last page
+      total_pages = Esc.Filter.total_pages(select.items, select.filter_text, select.page_size)
+      new_page = if select.current_page == 0, do: total_pages - 1, else: select.current_page - 1
+      new_page_indices = Esc.Filter.page_indices(select.items, select.filter_text, select.page_size, new_page)
+      new_index = List.last(new_page_indices) || select.selected_index
+      %{select | selected_index: new_index, current_page: new_page}
+    else
+      new_index = Enum.at(page_indices, current_pos - 1) || select.selected_index
+      %{select | selected_index: new_index}
+    end
   end
 
   defp move_down(%__MODULE__{} = select) do
-    filtered_indices = Esc.Filter.matching_indices(select.items, select.filter_text)
-    current_pos = Enum.find_index(filtered_indices, &(&1 == select.selected_index)) || 0
-    new_pos = if current_pos == length(filtered_indices) - 1, do: 0, else: current_pos + 1
-    new_index = Enum.at(filtered_indices, new_pos) || select.selected_index
-    %{select | selected_index: new_index}
+    page_indices = Esc.Filter.page_indices(select.items, select.filter_text, select.page_size, select.current_page)
+    current_pos = Enum.find_index(page_indices, &(&1 == select.selected_index)) || 0
+
+    if current_pos == length(page_indices) - 1 do
+      # At bottom of page - go to next page or wrap to first page
+      total_pages = Esc.Filter.total_pages(select.items, select.filter_text, select.page_size)
+      new_page = if select.current_page == total_pages - 1, do: 0, else: select.current_page + 1
+      new_page_indices = Esc.Filter.page_indices(select.items, select.filter_text, select.page_size, new_page)
+      new_index = List.first(new_page_indices) || select.selected_index
+      %{select | selected_index: new_index, current_page: new_page}
+    else
+      new_index = Enum.at(page_indices, current_pos + 1) || select.selected_index
+      %{select | selected_index: new_index}
+    end
   end
 
   defp move_home(%__MODULE__{} = select) do
-    filtered_indices = Esc.Filter.matching_indices(select.items, select.filter_text)
-    new_index = List.first(filtered_indices) || 0
-    %{select | selected_index: new_index}
+    # Jump to absolute first item on first page
+    page_indices = Esc.Filter.page_indices(select.items, select.filter_text, select.page_size, 0)
+    new_index = List.first(page_indices) || 0
+    %{select | selected_index: new_index, current_page: 0}
   end
 
   defp move_end(%__MODULE__{} = select) do
-    filtered_indices = Esc.Filter.matching_indices(select.items, select.filter_text)
-    new_index = List.last(filtered_indices) || length(select.items) - 1
-    %{select | selected_index: new_index}
+    # Jump to absolute last item across all pages
+    total_pages = Esc.Filter.total_pages(select.items, select.filter_text, select.page_size)
+    last_page = total_pages - 1
+    page_indices = Esc.Filter.page_indices(select.items, select.filter_text, select.page_size, last_page)
+    new_index = List.last(page_indices) || length(select.items) - 1
+    %{select | selected_index: new_index, current_page: last_page}
+  end
+
+  defp next_page(%__MODULE__{} = select) do
+    total_pages = Esc.Filter.total_pages(select.items, select.filter_text, select.page_size)
+    if select.current_page < total_pages - 1 do
+      new_page = select.current_page + 1
+      page_indices = Esc.Filter.page_indices(select.items, select.filter_text, select.page_size, new_page)
+      new_index = List.first(page_indices) || select.selected_index
+      %{select | current_page: new_page, selected_index: new_index}
+    else
+      select
+    end
+  end
+
+  defp prev_page(%__MODULE__{} = select) do
+    if select.current_page > 0 do
+      new_page = select.current_page - 1
+      page_indices = Esc.Filter.page_indices(select.items, select.filter_text, select.page_size, new_page)
+      new_index = List.first(page_indices) || select.selected_index
+      %{select | current_page: new_page, selected_index: new_index}
+    else
+      select
+    end
   end
 
   # Key reading using OTP 28 raw mode with IO.getn
@@ -416,6 +512,10 @@ defmodule Esc.Select do
       "k" -> :up
       "g" -> :home
       "G" -> :end_key
+      "]" -> :page_forward
+      "[" -> :page_backward
+      <<6>> -> :page_forward   # Ctrl+F
+      <<2>> -> :page_backward  # Ctrl+B
       "q" -> :cancel
       <<3>> -> :cancel  # Ctrl+C
       :eof -> :cancel

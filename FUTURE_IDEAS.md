@@ -39,7 +39,7 @@ Potential additions to the Esc terminal styling library.
 ## Navigation
 
 - [ ] **Breadcrumbs** - Path or hierarchy display with separators (Home > Projects > Esc).
-- [ ] **Pagination** - Page controls for navigating large datasets with page size options.
+- [x] **Pagination** - Page controls for navigating large datasets with page size options. [spec](plans/select-pagination/spec.md) | [plan](plans/select-pagination/plan.md)
 - [ ] **CommandPalette** - Fuzzy-searchable command menu (like VS Code's Ctrl+Shift+P) for action discovery.
 
 ## Advanced Select

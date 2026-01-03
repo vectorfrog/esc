@@ -30,6 +30,8 @@ defmodule Esc.MultiSelectTable do
   - `a` - Select all visible items (filtered items only when filtering)
   - `n` - Clear selections on visible items (filtered items only when filtering)
   - `/` - Enter filter mode
+  - `Ctrl+F` / `]` - Next page
+  - `Ctrl+B` / `[` - Previous page
 
   ## Filtering
 
@@ -44,6 +46,8 @@ defmodule Esc.MultiSelectTable do
   When a global theme is set and `use_theme` is enabled (default),
   the table automatically uses theme colors for cursor, selections, and borders.
   """
+
+  @default_page_size 100
 
   defstruct items: [],
             cursor_index: 0,
@@ -61,7 +65,9 @@ defmodule Esc.MultiSelectTable do
             help_style: nil,
             filter_mode: false,
             filter_text: "",
-            filter_style: nil
+            filter_style: nil,
+            page_size: @default_page_size,
+            current_page: 0
 
   @type item :: String.t() | {String.t(), term()}
 
@@ -82,7 +88,9 @@ defmodule Esc.MultiSelectTable do
           help_style: Esc.Style.t() | nil,
           filter_mode: boolean(),
           filter_text: String.t(),
-          filter_style: Esc.Style.t() | nil
+          filter_style: Esc.Style.t() | nil,
+          page_size: non_neg_integer() | nil,
+          current_page: non_neg_integer()
         }
 
   # Cursor adds [] around text = 2 chars, marker = 1 char, plus padding = 5 total extra
@@ -251,6 +259,16 @@ defmodule Esc.MultiSelectTable do
     %{table | filter_style: style}
   end
 
+  @doc """
+  Sets the number of items displayed per page.
+
+  Default is 100 items per page. Set to 0 or nil to disable pagination.
+  """
+  @spec page_size(t(), non_neg_integer() | nil) :: t()
+  def page_size(%__MODULE__{} = table, size) when is_nil(size) or size >= 0 do
+    %{table | page_size: size}
+  end
+
   # ===========================================================================
   # Rendering
   # ===========================================================================
@@ -262,24 +280,27 @@ defmodule Esc.MultiSelectTable do
   def render(%__MODULE__{items: []}), do: ""
 
   def render(%__MODULE__{} = table) do
-    # Get filtered items
+    # Get filtered items then paginate
     filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
-    filtered_items = Enum.map(filtered_indices, &Enum.at(table.items, &1))
+    page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+    page_items = Enum.map(page_indices, &Enum.at(table.items, &1))
+    total_pages = Esc.Filter.total_pages(table.items, table.filter_text, table.page_size)
 
-    # Calculate grid dimensions based on filtered items
-    {col_count, cell_width} = calculate_grid_dimensions_for_items(filtered_items, table)
+    # Calculate grid dimensions based on page items
+    {col_count, cell_width} = calculate_grid_dimensions_for_items(page_items, table)
     marker = table.selected_marker
     cursor_style = get_effective_cursor_style(table)
     selected_style = get_effective_selected_style(table)
     item_style = table.item_style
     border_style = get_effective_border_style(table)
+    filter_style = get_effective_filter_style(table)
 
-    # Find cursor position in filtered list
-    cursor_pos_in_filtered = Enum.find_index(filtered_indices, &(&1 == table.cursor_index))
+    # Find cursor position in page indices
+    cursor_pos_in_page = Enum.find_index(page_indices, &(&1 == table.cursor_index))
 
     # Build grid rows with styled cells
     cell_rows =
-      filtered_items
+      page_items
       |> Enum.with_index()
       |> Enum.chunk_every(col_count)
       |> Enum.map(fn chunk ->
@@ -291,11 +312,11 @@ defmodule Esc.MultiSelectTable do
             # Empty cell
             String.duplicate(" ", cell_width)
 
-          {item, pos_in_filtered} ->
+          {item, pos_in_page} ->
             # Get original index for selection check
-            original_idx = Enum.at(filtered_indices, pos_in_filtered)
+            original_idx = Enum.at(page_indices, pos_in_page)
             display_text = Esc.Filter.get_display_text(item)
-            is_focused = pos_in_filtered == cursor_pos_in_filtered
+            is_focused = pos_in_page == cursor_pos_in_page
             is_selected = MapSet.member?(table.selected_indices, original_idx)
 
             # Build cell content with visual indicators
@@ -331,16 +352,17 @@ defmodule Esc.MultiSelectTable do
 
     # Use shared grid renderer
     table_output =
-      if length(filtered_items) == 0 do
+      if length(page_items) == 0 do
         "(no matches)"
       else
         Esc.Grid.render(cell_rows, cell_width, table.border, border_style)
       end
 
-    # Add filter input if filter is active or has text
-    output_with_filter =
+    # Build header line with filter and/or pagination
+    header_parts = []
+
+    header_parts =
       if table.filter_mode or table.filter_text != "" do
-        filter_style = get_effective_filter_style(table)
         filter_line = Esc.Filter.render_filter_input(
           table.filter_text,
           table.filter_mode,
@@ -348,18 +370,32 @@ defmodule Esc.MultiSelectTable do
           match_count: {length(filtered_indices), length(table.items)},
           count_style: filter_style
         )
-        filter_line <> "\n\n" <> table_output
+        header_parts ++ [filter_line]
       else
-        table_output
+        header_parts
+      end
+
+    header_parts =
+      if total_pages > 1 do
+        pagination = Esc.Filter.render_pagination(table.current_page, total_pages, style: filter_style)
+        header_parts ++ [pagination]
+      else
+        header_parts
+      end
+
+    output_with_header =
+      case header_parts do
+        [] -> table_output
+        parts -> Enum.join(parts, " ") <> "\n\n" <> table_output
       end
 
     if table.show_help do
       help_text = build_help_text(table)
       help_style = get_effective_help_style(table)
       styled_help = if help_style, do: Esc.render(help_style, help_text), else: help_text
-      output_with_filter <> "\n" <> styled_help
+      output_with_header <> "\n" <> styled_help
     else
-      output_with_filter
+      output_with_header
     end
   end
 
@@ -443,10 +479,10 @@ defmodule Esc.MultiSelectTable do
   end
 
   defp handle_normal_mode_input(table, line_count) do
-    # Get filtered items for navigation
-    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
-    filtered_items = Enum.map(filtered_indices, &Enum.at(table.items, &1))
-    {col_count, _} = calculate_grid_dimensions_for_items(filtered_items, table)
+    # Get page items for navigation
+    page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+    page_items = Enum.map(page_indices, &Enum.at(table.items, &1))
+    {col_count, _} = calculate_grid_dimensions_for_items(page_items, table)
 
     case read_key() do
       :left ->
@@ -466,6 +502,12 @@ defmodule Esc.MultiSelectTable do
 
       :end_key ->
         move_and_redraw(table, line_count, &move_end/1)
+
+      :page_forward ->
+        move_and_redraw(table, line_count, &next_page/1)
+
+      :page_backward ->
+        move_and_redraw(table, line_count, &prev_page/1)
 
       :toggle ->
         move_and_redraw(table, line_count, &toggle_selection/1)
@@ -537,12 +579,12 @@ defmodule Esc.MultiSelectTable do
   end
 
   defp clear_filter(table) do
-    %{table | filter_text: "", cursor_index: 0}
+    %{table | filter_text: "", cursor_index: 0, current_page: 0}
   end
 
   defp add_filter_char(table, char) do
     new_filter = table.filter_text <> char
-    table = %{table | filter_text: new_filter}
+    table = %{table | filter_text: new_filter, current_page: 0}
     ensure_valid_cursor(table)
   end
 
@@ -571,68 +613,118 @@ defmodule Esc.MultiSelectTable do
   end
 
   defp move_left(table, _col_count) do
-    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
-    current_pos = Enum.find_index(filtered_indices, &(&1 == table.cursor_index)) || 0
-    new_pos = max(0, current_pos - 1)
-    new_index = Enum.at(filtered_indices, new_pos) || table.cursor_index
-    %{table | cursor_index: new_index}
+    page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+    current_pos = Enum.find_index(page_indices, &(&1 == table.cursor_index)) || 0
+
+    if current_pos == 0 do
+      # At start of page - go to previous page
+      if table.current_page > 0 do
+        new_page = table.current_page - 1
+        new_page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, new_page)
+        new_index = List.last(new_page_indices) || table.cursor_index
+        %{table | cursor_index: new_index, current_page: new_page}
+      else
+        table
+      end
+    else
+      new_index = Enum.at(page_indices, current_pos - 1) || table.cursor_index
+      %{table | cursor_index: new_index}
+    end
   end
 
   defp move_right(table, _col_count) do
-    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
-    current_pos = Enum.find_index(filtered_indices, &(&1 == table.cursor_index)) || 0
-    max_pos = length(filtered_indices) - 1
-    new_pos = min(max_pos, current_pos + 1)
-    new_index = Enum.at(filtered_indices, new_pos) || table.cursor_index
-    %{table | cursor_index: new_index}
+    page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+    current_pos = Enum.find_index(page_indices, &(&1 == table.cursor_index)) || 0
+    max_pos = length(page_indices) - 1
+
+    if current_pos == max_pos do
+      # At end of page - go to next page
+      total_pages = Esc.Filter.total_pages(table.items, table.filter_text, table.page_size)
+      if table.current_page < total_pages - 1 do
+        new_page = table.current_page + 1
+        new_page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, new_page)
+        new_index = List.first(new_page_indices) || table.cursor_index
+        %{table | cursor_index: new_index, current_page: new_page}
+      else
+        table
+      end
+    else
+      new_index = Enum.at(page_indices, current_pos + 1) || table.cursor_index
+      %{table | cursor_index: new_index}
+    end
   end
 
   defp move_up(table, col_count) do
-    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
-    current_pos = Enum.find_index(filtered_indices, &(&1 == table.cursor_index)) || 0
+    page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+    current_pos = Enum.find_index(page_indices, &(&1 == table.cursor_index)) || 0
     new_pos = current_pos - col_count
 
-    new_pos =
-      if new_pos >= 0 do
-        new_pos
-      else
-        row_count = ceil(length(filtered_indices) / col_count)
-        current_col = rem(current_pos, col_count)
-        wrapped_pos = (row_count - 1) * col_count + current_col
-        min(wrapped_pos, length(filtered_indices) - 1)
-      end
-
-    new_index = Enum.at(filtered_indices, new_pos) || table.cursor_index
-    %{table | cursor_index: new_index}
+    if new_pos >= 0 do
+      new_index = Enum.at(page_indices, new_pos) || table.cursor_index
+      %{table | cursor_index: new_index}
+    else
+      # At top of grid - wrap within current page
+      row_count = ceil(length(page_indices) / col_count)
+      current_col = rem(current_pos, col_count)
+      wrapped_pos = (row_count - 1) * col_count + current_col
+      wrapped_pos = min(wrapped_pos, length(page_indices) - 1)
+      new_index = Enum.at(page_indices, wrapped_pos) || table.cursor_index
+      %{table | cursor_index: new_index}
+    end
   end
 
   defp move_down(table, col_count) do
-    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
-    current_pos = Enum.find_index(filtered_indices, &(&1 == table.cursor_index)) || 0
+    page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+    current_pos = Enum.find_index(page_indices, &(&1 == table.cursor_index)) || 0
     new_pos = current_pos + col_count
-    max_pos = length(filtered_indices) - 1
+    max_pos = length(page_indices) - 1
 
-    new_pos =
-      if new_pos <= max_pos do
-        new_pos
-      else
-        rem(current_pos, col_count)
-      end
-
-    new_index = Enum.at(filtered_indices, new_pos) || table.cursor_index
-    %{table | cursor_index: new_index}
+    if new_pos <= max_pos do
+      new_index = Enum.at(page_indices, new_pos) || table.cursor_index
+      %{table | cursor_index: new_index}
+    else
+      # At bottom of grid - wrap within current page
+      new_pos = rem(current_pos, col_count)
+      new_index = Enum.at(page_indices, new_pos) || table.cursor_index
+      %{table | cursor_index: new_index}
+    end
   end
 
   defp move_home(table) do
-    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
-    new_index = List.first(filtered_indices) || 0
-    %{table | cursor_index: new_index}
+    page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, 0)
+    new_index = List.first(page_indices) || 0
+    %{table | cursor_index: new_index, current_page: 0}
   end
 
   defp move_end(table) do
-    filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
-    new_index = List.last(filtered_indices) || length(table.items) - 1
-    %{table | cursor_index: new_index}
+    total_pages = Esc.Filter.total_pages(table.items, table.filter_text, table.page_size)
+    last_page = total_pages - 1
+    page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, last_page)
+    new_index = List.last(page_indices) || length(table.items) - 1
+    %{table | cursor_index: new_index, current_page: last_page}
+  end
+
+  defp next_page(table) do
+    total_pages = Esc.Filter.total_pages(table.items, table.filter_text, table.page_size)
+    if table.current_page < total_pages - 1 do
+      new_page = table.current_page + 1
+      page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, new_page)
+      new_index = List.first(page_indices) || table.cursor_index
+      %{table | current_page: new_page, cursor_index: new_index}
+    else
+      table
+    end
+  end
+
+  defp prev_page(table) do
+    if table.current_page > 0 do
+      new_page = table.current_page - 1
+      page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, new_page)
+      new_index = List.first(page_indices) || table.cursor_index
+      %{table | current_page: new_page, cursor_index: new_index}
+    else
+      table
+    end
   end
 
   defp toggle_selection(table) do
@@ -705,6 +797,10 @@ defmodule Esc.MultiSelectTable do
       "l" -> :right
       "g" -> :home
       "G" -> :end_key
+      "]" -> :page_forward
+      "[" -> :page_backward
+      <<6>> -> :page_forward   # Ctrl+F
+      <<2>> -> :page_backward  # Ctrl+B
       "a" -> :select_all
       "n" -> :select_none
       "q" -> :cancel

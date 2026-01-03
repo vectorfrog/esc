@@ -45,7 +45,7 @@ Add `esc` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:esc, "~> 0.6.0"}
+    {:esc, "~> 0.8.0"}
   ]
 end
 ```
@@ -489,6 +489,27 @@ Select.new(["A", "B", "C"]) |> Select.use_theme(false) |> Select.run()
 | `q` / `Escape` | Cancel |
 | `g` / `Home` | Jump to first |
 | `G` / `End` | Jump to last |
+| `/` | Enter filter mode |
+| `]` / `Ctrl+F` | Next page |
+| `[` / `Ctrl+B` | Previous page |
+
+### Pagination
+
+For large lists, items are automatically paginated (default: 100 items per page). Use `]`/`[` or `Ctrl+F`/`Ctrl+B` to navigate between pages:
+
+```elixir
+# Large dataset with default pagination (100 per page)
+items = for i <- 1..500, do: {"Item #{i}", i}
+Select.new(items) |> Select.run()
+
+# Custom page size
+Select.new(items) |> Select.page_size(25) |> Select.run()
+
+# Disable pagination (show all items)
+Select.new(items) |> Select.page_size(0) |> Select.run()
+```
+
+The page indicator shows `[Page 1/5]` when multiple pages exist. Navigation with `j`/`k` automatically advances to the next/previous page at boundaries.
 
 ### OTP 28 Setup
 

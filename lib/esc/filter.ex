@@ -152,6 +152,69 @@ defmodule Esc.Filter do
   def get_display_text({text, _value}) when is_binary(text), do: text
   def get_display_text(text) when is_binary(text), do: text
 
+  # Pagination helpers
+
+  @doc """
+  Returns the indices of items visible on the current page.
+
+  Takes into account filtering - pagination applies to filtered results.
+  Returns all matching indices if page_size is 0 or nil (pagination disabled).
+  """
+  @spec page_indices([item], String.t(), non_neg_integer() | nil, non_neg_integer()) ::
+          [non_neg_integer()]
+        when item: String.t() | {String.t(), term()}
+  def page_indices(items, filter_text, page_size, _current_page)
+      when is_nil(page_size) or page_size == 0 do
+    matching_indices(items, filter_text)
+  end
+
+  def page_indices(items, filter_text, page_size, current_page) do
+    all_indices = matching_indices(items, filter_text)
+    start_idx = current_page * page_size
+    Enum.slice(all_indices, start_idx, page_size)
+  end
+
+  @doc """
+  Returns the total number of pages for the given items and filter.
+
+  Returns 1 if pagination is disabled (page_size is 0 or nil).
+  """
+  @spec total_pages([item], String.t(), non_neg_integer() | nil) :: pos_integer()
+        when item: String.t() | {String.t(), term()}
+  def total_pages(_items, _filter_text, page_size) when is_nil(page_size) or page_size == 0, do: 1
+
+  def total_pages(items, filter_text, page_size) do
+    count = length(matching_indices(items, filter_text))
+    max(1, ceil(count / page_size))
+  end
+
+  @doc """
+  Ensures current_page is valid for the given item count.
+
+  Clamps page to valid range [0, total_pages - 1].
+  """
+  @spec clamp_page(non_neg_integer(), [item], String.t(), non_neg_integer() | nil) ::
+          non_neg_integer()
+        when item: String.t() | {String.t(), term()}
+  def clamp_page(current_page, items, filter_text, page_size) do
+    max_page = total_pages(items, filter_text, page_size) - 1
+    min(max(0, current_page), max_page)
+  end
+
+  @doc """
+  Renders the pagination indicator.
+
+  Returns empty string if only one page exists.
+  """
+  @spec render_pagination(non_neg_integer(), pos_integer(), keyword()) :: String.t()
+  def render_pagination(_current_page, total, _opts) when total <= 1, do: ""
+
+  def render_pagination(current_page, total, opts) do
+    style = Keyword.get(opts, :style)
+    text = "[Page #{current_page + 1}/#{total}]"
+    apply_style(text, style)
+  end
+
   # Private helpers
 
   defp apply_style(text, nil), do: text

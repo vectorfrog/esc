@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-01-03
+
+### Added
+
+- **Pagination for all select components**: Handle large item lists efficiently
+  - Default page size of 100 items (customizable via `page_size/2`)
+  - Vim-style navigation: `]`/`Ctrl+F` next page, `[`/`Ctrl+B` previous page
+  - Page indicator shows `[Page 1/5]` when multiple pages exist
+  - Navigation with `j`/`k` automatically advances pages at boundaries
+  - `g`/`G` jump to absolute first/last item across all pages
+  - Works seamlessly with filter mode (pagination applies to filtered results)
+  - Set `page_size(0)` or `page_size(nil)` to disable pagination
+  - New `Esc.Filter` pagination helpers: `page_indices/4`, `total_pages/3`, `clamp_page/4`, `render_pagination/3`
+- Demo script at `examples/pagination_demo.exs`
+
 ## [0.7.0] - 2026-01-03
 
 ### Added
@@ -98,7 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Table component**: Data tables with headers, custom borders, and column alignment
 - **Tree component**: Hierarchical tree rendering with connectors
 
-[Unreleased]: https://github.com/vectorfrog/esc/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/vectorfrog/esc/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/vectorfrog/esc/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/vectorfrog/esc/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/vectorfrog/esc/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/vectorfrog/esc/compare/v0.4.0...v0.5.0

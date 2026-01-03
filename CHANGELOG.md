@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-01-03
+
+### Added
+
+- **Spinner component**: Animated indeterminate loading indicators
+  - 10 built-in styles: dots, line, circle, arc, bounce, arrows, box, pulse, moon, clock
+  - Custom frame support for user-defined animations
+  - Text positioning (left or right of spinner)
+  - Customizable frame rate
+  - Theme integration (uses `:emphasis` for spinner, `:muted` for text)
+  - Block-based execution with `run/2` for automatic start/stop
+  - Manual control with `start/1`, `stop/1`, `update_text/2`
+  - Frame width normalization for consistent display
+- Demo script at `examples/spinner_demo.exs`
+
 ## [0.6.0] - 2026-01-02
 
 ### Added
@@ -83,7 +98,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Table component**: Data tables with headers, custom borders, and column alignment
 - **Tree component**: Hierarchical tree rendering with connectors
 
-[Unreleased]: https://github.com/vectorfrog/esc/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/vectorfrog/esc/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/vectorfrog/esc/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/vectorfrog/esc/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/vectorfrog/esc/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/vectorfrog/esc/compare/v0.1.0...v0.4.0

@@ -282,7 +282,10 @@ defmodule Esc.MultiSelectTable do
   def render(%__MODULE__{} = table) do
     # Get filtered items then paginate
     filtered_indices = Esc.Filter.matching_indices(table.items, table.filter_text)
-    page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+
+    page_indices =
+      Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+
     page_items = Enum.map(page_indices, &Enum.at(table.items, &1))
     total_pages = Esc.Filter.total_pages(table.items, table.filter_text, table.page_size)
 
@@ -363,13 +366,15 @@ defmodule Esc.MultiSelectTable do
 
     header_parts =
       if table.filter_mode or table.filter_text != "" do
-        filter_line = Esc.Filter.render_filter_input(
-          table.filter_text,
-          table.filter_mode,
-          prompt_style: filter_style,
-          match_count: {length(filtered_indices), length(table.items)},
-          count_style: filter_style
-        )
+        filter_line =
+          Esc.Filter.render_filter_input(
+            table.filter_text,
+            table.filter_mode,
+            prompt_style: filter_style,
+            match_count: {length(filtered_indices), length(table.items)},
+            count_style: filter_style
+          )
+
         header_parts ++ [filter_line]
       else
         header_parts
@@ -377,7 +382,9 @@ defmodule Esc.MultiSelectTable do
 
     header_parts =
       if total_pages > 1 do
-        pagination = Esc.Filter.render_pagination(table.current_page, total_pages, style: filter_style)
+        pagination =
+          Esc.Filter.render_pagination(table.current_page, total_pages, style: filter_style)
+
         header_parts ++ [pagination]
       else
         header_parts
@@ -426,8 +433,13 @@ defmodule Esc.MultiSelectTable do
 
   defp calculate_grid_dimensions_for_items([], _table), do: {1, 10}
 
-  defp calculate_grid_dimensions_for_items(items, %__MODULE__{columns: cols}) when is_integer(cols) do
-    max_item_len = items |> Enum.map(&(Esc.Filter.get_display_text(&1) |> Esc.Grid.display_width())) |> Enum.max(fn -> 0 end)
+  defp calculate_grid_dimensions_for_items(items, %__MODULE__{columns: cols})
+       when is_integer(cols) do
+    max_item_len =
+      items
+      |> Enum.map(&(Esc.Filter.get_display_text(&1) |> Esc.Grid.display_width()))
+      |> Enum.max(fn -> 0 end)
+
     cell_width = max(max_item_len + @cursor_overhead, 4)
     {cols, cell_width}
   end
@@ -436,7 +448,11 @@ defmodule Esc.MultiSelectTable do
     terminal_width = Esc.Table.get_terminal_width()
 
     # Use display_width for emoji/CJK support
-    max_item_len = items |> Enum.map(&(Esc.Filter.get_display_text(&1) |> Esc.Grid.display_width())) |> Enum.max(fn -> 0 end)
+    max_item_len =
+      items
+      |> Enum.map(&(Esc.Filter.get_display_text(&1) |> Esc.Grid.display_width()))
+      |> Enum.max(fn -> 0 end)
+
     cell_width = max(max_item_len + @cursor_overhead, 4)
 
     # Calculate how many columns fit (with 2-char safety margin to prevent wrapping)
@@ -452,6 +468,7 @@ defmodule Esc.MultiSelectTable do
 
   defp pad_to_width(string, width) do
     len = Esc.Grid.display_width(string)
+
     if len >= width do
       string
     else
@@ -480,7 +497,9 @@ defmodule Esc.MultiSelectTable do
 
   defp handle_normal_mode_input(table, line_count) do
     # Get page items for navigation
-    page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+    page_indices =
+      Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+
     page_items = Enum.map(page_indices, &Enum.at(table.items, &1))
     {col_count, _} = calculate_grid_dimensions_for_items(page_items, table)
 
@@ -589,6 +608,7 @@ defmodule Esc.MultiSelectTable do
   end
 
   defp delete_filter_char(%{filter_text: ""} = table), do: table
+
   defp delete_filter_char(table) do
     new_filter = String.slice(table.filter_text, 0..-2//1)
     %{table | filter_text: new_filter}
@@ -613,14 +633,19 @@ defmodule Esc.MultiSelectTable do
   end
 
   defp move_left(table, _col_count) do
-    page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+    page_indices =
+      Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+
     current_pos = Enum.find_index(page_indices, &(&1 == table.cursor_index)) || 0
 
     if current_pos == 0 do
       # At start of page - go to previous page
       if table.current_page > 0 do
         new_page = table.current_page - 1
-        new_page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, new_page)
+
+        new_page_indices =
+          Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, new_page)
+
         new_index = List.last(new_page_indices) || table.cursor_index
         %{table | cursor_index: new_index, current_page: new_page}
       else
@@ -633,16 +658,22 @@ defmodule Esc.MultiSelectTable do
   end
 
   defp move_right(table, _col_count) do
-    page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+    page_indices =
+      Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+
     current_pos = Enum.find_index(page_indices, &(&1 == table.cursor_index)) || 0
     max_pos = length(page_indices) - 1
 
     if current_pos == max_pos do
       # At end of page - go to next page
       total_pages = Esc.Filter.total_pages(table.items, table.filter_text, table.page_size)
+
       if table.current_page < total_pages - 1 do
         new_page = table.current_page + 1
-        new_page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, new_page)
+
+        new_page_indices =
+          Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, new_page)
+
         new_index = List.first(new_page_indices) || table.cursor_index
         %{table | cursor_index: new_index, current_page: new_page}
       else
@@ -655,7 +686,9 @@ defmodule Esc.MultiSelectTable do
   end
 
   defp move_up(table, col_count) do
-    page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+    page_indices =
+      Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+
     current_pos = Enum.find_index(page_indices, &(&1 == table.cursor_index)) || 0
     new_pos = current_pos - col_count
 
@@ -674,7 +707,9 @@ defmodule Esc.MultiSelectTable do
   end
 
   defp move_down(table, col_count) do
-    page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+    page_indices =
+      Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, table.current_page)
+
     current_pos = Enum.find_index(page_indices, &(&1 == table.cursor_index)) || 0
     new_pos = current_pos + col_count
     max_pos = length(page_indices) - 1
@@ -699,16 +734,23 @@ defmodule Esc.MultiSelectTable do
   defp move_end(table) do
     total_pages = Esc.Filter.total_pages(table.items, table.filter_text, table.page_size)
     last_page = total_pages - 1
-    page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, last_page)
+
+    page_indices =
+      Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, last_page)
+
     new_index = List.last(page_indices) || length(table.items) - 1
     %{table | cursor_index: new_index, current_page: last_page}
   end
 
   defp next_page(table) do
     total_pages = Esc.Filter.total_pages(table.items, table.filter_text, table.page_size)
+
     if table.current_page < total_pages - 1 do
       new_page = table.current_page + 1
-      page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, new_page)
+
+      page_indices =
+        Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, new_page)
+
       new_index = List.first(page_indices) || table.cursor_index
       %{table | current_page: new_page, cursor_index: new_index}
     else
@@ -719,7 +761,10 @@ defmodule Esc.MultiSelectTable do
   defp prev_page(table) do
     if table.current_page > 0 do
       new_page = table.current_page - 1
-      page_indices = Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, new_page)
+
+      page_indices =
+        Esc.Filter.page_indices(table.items, table.filter_text, table.page_size, new_page)
+
       new_index = List.first(page_indices) || table.cursor_index
       %{table | current_page: new_page, cursor_index: new_index}
     else
@@ -799,8 +844,10 @@ defmodule Esc.MultiSelectTable do
       "G" -> :end_key
       "]" -> :page_forward
       "[" -> :page_backward
-      <<6>> -> :page_forward   # Ctrl+F
-      <<2>> -> :page_backward  # Ctrl+B
+      # Ctrl+F
+      <<6>> -> :page_forward
+      # Ctrl+B
+      <<2>> -> :page_backward
       "a" -> :select_all
       "n" -> :select_none
       "q" -> :cancel
@@ -812,21 +859,39 @@ defmodule Esc.MultiSelectTable do
 
   defp read_filter_key do
     case read_char() do
-      "\e" -> :escape
-      "\r" -> :enter
-      "\n" -> :enter
-      <<127>> -> :backspace
-      <<8>> -> :backspace
-      <<21>> -> :clear_line
-      <<3>> -> :escape
-      :eof -> :escape
+      "\e" ->
+        :escape
+
+      "\r" ->
+        :enter
+
+      "\n" ->
+        :enter
+
+      <<127>> ->
+        :backspace
+
+      <<8>> ->
+        :backspace
+
+      <<21>> ->
+        :clear_line
+
+      <<3>> ->
+        :escape
+
+      :eof ->
+        :escape
+
       char when is_binary(char) ->
         if String.printable?(char) and String.length(char) == 1 do
           {:char, char}
         else
           :unknown
         end
-      _ -> :unknown
+
+      _ ->
+        :unknown
     end
   end
 
@@ -836,27 +901,45 @@ defmodule Esc.MultiSelectTable do
     case read_char() do
       "[" ->
         case read_char() do
-          "A" -> :up
-          "B" -> :down
-          "C" -> :right
-          "D" -> :left
-          "Z" -> :left
-          "H" -> :home
-          "F" -> :end_key
+          "A" ->
+            :up
+
+          "B" ->
+            :down
+
+          "C" ->
+            :right
+
+          "D" ->
+            :left
+
+          "Z" ->
+            :left
+
+          "H" ->
+            :home
+
+          "F" ->
+            :end_key
+
           "1" ->
             case read_char() do
               "~" -> :home
               _ -> :unknown
             end
+
           "4" ->
             case read_char() do
               "~" -> :end_key
               _ -> :unknown
             end
-          _ -> :unknown
+
+          _ ->
+            :unknown
         end
 
-      _ -> :cancel
+      _ ->
+        :cancel
     end
   end
 

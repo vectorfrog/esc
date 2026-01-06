@@ -40,7 +40,8 @@ defmodule Esc.FilterTest do
     test "escapes regex special characters with wildcards" do
       pattern = Filter.compile_pattern("*.txt")
       assert Regex.match?(pattern, "file.txt")
-      refute Regex.match?(pattern, "filetxt")  # dot should be escaped
+      # dot should be escaped
+      refute Regex.match?(pattern, "filetxt")
     end
   end
 
@@ -127,6 +128,7 @@ defmodule Esc.FilterTest do
         {"Banana", :banana},
         {"Apricot", :apricot}
       ]
+
       result = Filter.filter_items(items, "ap")
       assert result == [{"Apple", :apple}, {"Apricot", :apricot}]
     end
@@ -159,7 +161,8 @@ defmodule Esc.FilterTest do
     test "returns indices of matching items" do
       items = ["apple", "banana", "apricot", "cherry"]
       result = Filter.matching_indices(items, "ap")
-      assert result == [0, 2]  # "apple" at 0, "apricot" at 2
+      # "apple" at 0, "apricot" at 2
+      assert result == [0, 2]
     end
 
     test "returns indices for tuple items" do
@@ -168,6 +171,7 @@ defmodule Esc.FilterTest do
         {"Banana", :b},
         {"Apricot", :c}
       ]
+
       result = Filter.matching_indices(items, "ap")
       assert result == [0, 2]
     end
@@ -229,22 +233,28 @@ defmodule Esc.FilterTest do
     test "applies prompt style" do
       style = Esc.style() |> Esc.foreground(:cyan)
       result = Filter.render_filter_input("", false, prompt_style: style)
-      assert result =~ "\e[36m"  # cyan color code
+      # cyan color code
+      assert result =~ "\e[36m"
     end
 
     test "applies text style" do
       style = Esc.style() |> Esc.bold()
       result = Filter.render_filter_input("test", false, text_style: style)
-      assert result =~ "\e[1m"  # bold code
+      # bold code
+      assert result =~ "\e[1m"
     end
 
     test "applies count style" do
       style = Esc.style() |> Esc.faint()
-      result = Filter.render_filter_input("test", false,
-        match_count: {5, 10},
-        count_style: style
-      )
-      assert result =~ "\e[2m"  # faint code
+
+      result =
+        Filter.render_filter_input("test", false,
+          match_count: {5, 10},
+          count_style: style
+        )
+
+      # faint code
+      assert result =~ "\e[2m"
     end
   end
 
@@ -369,7 +379,8 @@ defmodule Esc.FilterTest do
     test "applies style" do
       style = Esc.style() |> Esc.foreground(:cyan)
       result = Filter.render_pagination(0, 5, style: style)
-      assert result =~ "\e[36m"  # cyan color code
+      # cyan color code
+      assert result =~ "\e[36m"
     end
   end
 end

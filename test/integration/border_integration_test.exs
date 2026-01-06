@@ -199,7 +199,8 @@ defmodule Esc.Integration.BorderTest do
 
       # All lines should be same width
       widths = Enum.map(lines, &visible_width/1)
-      assert Enum.uniq(widths) == [22]  # 20 + 2 for borders
+      # 20 + 2 for borders
+      assert Enum.uniq(widths) == [22]
     end
   end
 end

@@ -50,6 +50,7 @@ defmodule Esc.ThemeTest do
           assert is_tuple(color), "#{name} missing ansi_#{i}"
           assert tuple_size(color) == 3
         end
+
         # Check background/foreground
         assert is_tuple(theme.background)
         assert is_tuple(theme.foreground)

@@ -38,15 +38,30 @@ defmodule Esc.Grid do
 
   defp render_grid(rows, cell_width, box, border_style) do
     col_count = length(List.first(rows) || [])
-    inner_width = cell_width + 2  # 1 space padding each side
+    # 1 space padding each side
+    inner_width = cell_width + 2
 
     # Build horizontal lines
     top_line = box.top_left <> String.duplicate(box.horizontal, inner_width)
-    top_line = top_line <> String.duplicate(box.top_mid <> String.duplicate(box.horizontal, inner_width), col_count - 1)
+
+    top_line =
+      top_line <>
+        String.duplicate(
+          box.top_mid <> String.duplicate(box.horizontal, inner_width),
+          col_count - 1
+        )
+
     top_line = top_line <> box.top_right
 
     bottom_line = box.bottom_left <> String.duplicate(box.horizontal, inner_width)
-    bottom_line = bottom_line <> String.duplicate(box.bottom_mid <> String.duplicate(box.horizontal, inner_width), col_count - 1)
+
+    bottom_line =
+      bottom_line <>
+        String.duplicate(
+          box.bottom_mid <> String.duplicate(box.horizontal, inner_width),
+          col_count - 1
+        )
+
     bottom_line = bottom_line <> box.bottom_right
 
     # Style the border lines
@@ -64,7 +79,7 @@ defmodule Esc.Grid do
         left <> Enum.join(cells_with_padding, sep) <> right
       end)
 
-    [styled_top | content_lines] ++ [styled_bottom]
+    ([styled_top | content_lines] ++ [styled_bottom])
     |> Enum.join("\n")
   end
 
@@ -73,41 +88,72 @@ defmodule Esc.Grid do
   # ===========================================================================
 
   defp get_box_chars(nil), do: nil
+
   defp get_box_chars(:rounded) do
     %{
-      top_left: "╭", top_right: "╮", bottom_left: "╰", bottom_right: "╯",
-      top_mid: "┬", bottom_mid: "┴",
-      horizontal: "─", vertical: "│"
+      top_left: "╭",
+      top_right: "╮",
+      bottom_left: "╰",
+      bottom_right: "╯",
+      top_mid: "┬",
+      bottom_mid: "┴",
+      horizontal: "─",
+      vertical: "│"
     }
   end
+
   defp get_box_chars(:normal) do
     %{
-      top_left: "┌", top_right: "┐", bottom_left: "└", bottom_right: "┘",
-      top_mid: "┬", bottom_mid: "┴",
-      horizontal: "─", vertical: "│"
+      top_left: "┌",
+      top_right: "┐",
+      bottom_left: "└",
+      bottom_right: "┘",
+      top_mid: "┬",
+      bottom_mid: "┴",
+      horizontal: "─",
+      vertical: "│"
     }
   end
+
   defp get_box_chars(:thick) do
     %{
-      top_left: "┏", top_right: "┓", bottom_left: "┗", bottom_right: "┛",
-      top_mid: "┳", bottom_mid: "┻",
-      horizontal: "━", vertical: "┃"
+      top_left: "┏",
+      top_right: "┓",
+      bottom_left: "┗",
+      bottom_right: "┛",
+      top_mid: "┳",
+      bottom_mid: "┻",
+      horizontal: "━",
+      vertical: "┃"
     }
   end
+
   defp get_box_chars(:double) do
     %{
-      top_left: "╔", top_right: "╗", bottom_left: "╚", bottom_right: "╝",
-      top_mid: "╦", bottom_mid: "╩",
-      horizontal: "═", vertical: "║"
+      top_left: "╔",
+      top_right: "╗",
+      bottom_left: "╚",
+      bottom_right: "╝",
+      top_mid: "╦",
+      bottom_mid: "╩",
+      horizontal: "═",
+      vertical: "║"
     }
   end
+
   defp get_box_chars(:ascii) do
     %{
-      top_left: "+", top_right: "+", bottom_left: "+", bottom_right: "+",
-      top_mid: "+", bottom_mid: "+",
-      horizontal: "-", vertical: "|"
+      top_left: "+",
+      top_right: "+",
+      bottom_left: "+",
+      bottom_right: "+",
+      top_mid: "+",
+      bottom_mid: "+",
+      horizontal: "-",
+      vertical: "|"
     }
   end
+
   defp get_box_chars(_), do: get_box_chars(:rounded)
 
   # ===========================================================================

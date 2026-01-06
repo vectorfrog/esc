@@ -102,13 +102,25 @@ defmodule Esc do
   @spec padding(style(), non_neg_integer(), non_neg_integer()) :: style()
   def padding(%Style{} = s, vertical, horizontal)
       when is_integer(vertical) and is_integer(horizontal) and vertical >= 0 and horizontal >= 0 do
-    %{s | padding_top: vertical, padding_right: horizontal, padding_bottom: vertical, padding_left: horizontal}
+    %{
+      s
+      | padding_top: vertical,
+        padding_right: horizontal,
+        padding_bottom: vertical,
+        padding_left: horizontal
+    }
   end
 
   @doc """
   Sets padding for each side individually.
   """
-  @spec padding(style(), non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer()) :: style()
+  @spec padding(
+          style(),
+          non_neg_integer(),
+          non_neg_integer(),
+          non_neg_integer(),
+          non_neg_integer()
+        ) :: style()
   def padding(%Style{} = s, top, right, bottom, left) do
     %{s | padding_top: top, padding_right: right, padding_bottom: bottom, padding_left: left}
   end
@@ -129,13 +141,25 @@ defmodule Esc do
   @spec margin(style(), non_neg_integer(), non_neg_integer()) :: style()
   def margin(%Style{} = s, vertical, horizontal)
       when is_integer(vertical) and is_integer(horizontal) and vertical >= 0 and horizontal >= 0 do
-    %{s | margin_top: vertical, margin_right: horizontal, margin_bottom: vertical, margin_left: horizontal}
+    %{
+      s
+      | margin_top: vertical,
+        margin_right: horizontal,
+        margin_bottom: vertical,
+        margin_left: horizontal
+    }
   end
 
   @doc """
   Sets margin for each side individually.
   """
-  @spec margin(style(), non_neg_integer(), non_neg_integer(), non_neg_integer(), non_neg_integer()) :: style()
+  @spec margin(
+          style(),
+          non_neg_integer(),
+          non_neg_integer(),
+          non_neg_integer(),
+          non_neg_integer()
+        ) :: style()
   def margin(%Style{} = s, top, right, bottom, left) do
     %{s | margin_top: top, margin_right: right, margin_bottom: bottom, margin_left: left}
   end
@@ -285,29 +309,71 @@ defmodule Esc do
       bold: if(s.bold == default.bold, do: base.bold, else: s.bold),
       italic: if(s.italic == default.italic, do: base.italic, else: s.italic),
       underline: if(s.underline == default.underline, do: base.underline, else: s.underline),
-      strikethrough: if(s.strikethrough == default.strikethrough, do: base.strikethrough, else: s.strikethrough),
+      strikethrough:
+        if(s.strikethrough == default.strikethrough,
+          do: base.strikethrough,
+          else: s.strikethrough
+        ),
       faint: if(s.faint == default.faint, do: base.faint, else: s.faint),
       blink: if(s.blink == default.blink, do: base.blink, else: s.blink),
       reverse: if(s.reverse == default.reverse, do: base.reverse, else: s.reverse),
-      padding_top: if(s.padding_top == default.padding_top, do: base.padding_top, else: s.padding_top),
-      padding_right: if(s.padding_right == default.padding_right, do: base.padding_right, else: s.padding_right),
-      padding_bottom: if(s.padding_bottom == default.padding_bottom, do: base.padding_bottom, else: s.padding_bottom),
-      padding_left: if(s.padding_left == default.padding_left, do: base.padding_left, else: s.padding_left),
+      padding_top:
+        if(s.padding_top == default.padding_top, do: base.padding_top, else: s.padding_top),
+      padding_right:
+        if(s.padding_right == default.padding_right,
+          do: base.padding_right,
+          else: s.padding_right
+        ),
+      padding_bottom:
+        if(s.padding_bottom == default.padding_bottom,
+          do: base.padding_bottom,
+          else: s.padding_bottom
+        ),
+      padding_left:
+        if(s.padding_left == default.padding_left, do: base.padding_left, else: s.padding_left),
       margin_top: if(s.margin_top == default.margin_top, do: base.margin_top, else: s.margin_top),
-      margin_right: if(s.margin_right == default.margin_right, do: base.margin_right, else: s.margin_right),
-      margin_bottom: if(s.margin_bottom == default.margin_bottom, do: base.margin_bottom, else: s.margin_bottom),
-      margin_left: if(s.margin_left == default.margin_left, do: base.margin_left, else: s.margin_left),
+      margin_right:
+        if(s.margin_right == default.margin_right, do: base.margin_right, else: s.margin_right),
+      margin_bottom:
+        if(s.margin_bottom == default.margin_bottom,
+          do: base.margin_bottom,
+          else: s.margin_bottom
+        ),
+      margin_left:
+        if(s.margin_left == default.margin_left, do: base.margin_left, else: s.margin_left),
       border: if(s.border == default.border, do: base.border, else: s.border),
       border_top: if(s.border_top == default.border_top, do: base.border_top, else: s.border_top),
-      border_right: if(s.border_right == default.border_right, do: base.border_right, else: s.border_right),
-      border_bottom: if(s.border_bottom == default.border_bottom, do: base.border_bottom, else: s.border_bottom),
-      border_left: if(s.border_left == default.border_left, do: base.border_left, else: s.border_left),
-      border_foreground: if(s.border_foreground == default.border_foreground, do: base.border_foreground, else: s.border_foreground),
-      border_background: if(s.border_background == default.border_background, do: base.border_background, else: s.border_background),
+      border_right:
+        if(s.border_right == default.border_right, do: base.border_right, else: s.border_right),
+      border_bottom:
+        if(s.border_bottom == default.border_bottom,
+          do: base.border_bottom,
+          else: s.border_bottom
+        ),
+      border_left:
+        if(s.border_left == default.border_left, do: base.border_left, else: s.border_left),
+      border_foreground:
+        if(s.border_foreground == default.border_foreground,
+          do: base.border_foreground,
+          else: s.border_foreground
+        ),
+      border_background:
+        if(s.border_background == default.border_background,
+          do: base.border_background,
+          else: s.border_background
+        ),
       width: if(s.width == default.width, do: base.width, else: s.width),
       height: if(s.height == default.height, do: base.height, else: s.height),
-      align_horizontal: if(s.align_horizontal == default.align_horizontal, do: base.align_horizontal, else: s.align_horizontal),
-      align_vertical: if(s.align_vertical == default.align_vertical, do: base.align_vertical, else: s.align_vertical),
+      align_horizontal:
+        if(s.align_horizontal == default.align_horizontal,
+          do: base.align_horizontal,
+          else: s.align_horizontal
+        ),
+      align_vertical:
+        if(s.align_vertical == default.align_vertical,
+          do: base.align_vertical,
+          else: s.align_vertical
+        ),
       tab_width: if(s.tab_width == default.tab_width, do: base.tab_width, else: s.tab_width),
       inline: if(s.inline == default.inline, do: base.inline, else: s.inline),
       max_width: if(s.max_width == default.max_width, do: base.max_width, else: s.max_width),
@@ -449,16 +515,23 @@ defmodule Esc do
   def has_dark_background? do
     # Check COLORFGBG environment variable (format: "fg;bg")
     case System.get_env("COLORFGBG") do
-      nil -> true  # Default to dark
+      # Default to dark
+      nil ->
+        true
+
       value ->
         case String.split(value, ";") do
           [_, bg | _] ->
             case Integer.parse(bg) do
-              {n, _} when n in [0, 1, 2, 3, 4, 5, 6, 8] -> true   # Dark colors
-              {n, _} when n in [7, 15] -> false  # Light colors
+              # Dark colors
+              {n, _} when n in [0, 1, 2, 3, 4, 5, 6, 8] -> true
+              # Light colors
+              {n, _} when n in [7, 15] -> false
               _ -> true
             end
-          _ -> true
+
+          _ ->
+            true
         end
     end
   end
@@ -486,7 +559,9 @@ defmodule Esc do
     case :io.getopts(:standard_io) do
       opts when is_list(opts) ->
         Keyword.get(opts, :encoding, :latin1) != :latin1
-      _ -> false
+
+      _ ->
+        false
     end
   rescue
     _ -> false
@@ -756,6 +831,7 @@ defmodule Esc do
         # Ensure all lines are same width
         Enum.map(padded_lines, fn line ->
           line_width = display_width(line)
+
           if line_width < width do
             line <> String.duplicate(" ", width - line_width)
           else
@@ -831,7 +907,13 @@ defmodule Esc do
       Esc.place(20, 5, :center, :middle, "X")
       # Returns a 20x5 box with "X" centered
   """
-  @spec place(non_neg_integer(), non_neg_integer(), :left | :center | :right, :top | :middle | :bottom, String.t()) :: String.t()
+  @spec place(
+          non_neg_integer(),
+          non_neg_integer(),
+          :left | :center | :right,
+          :top | :middle | :bottom,
+          String.t()
+        ) :: String.t()
   def place(width, height, h_align, v_align, text) do
     text
     |> then(&place_horizontal(width, h_align, &1))
@@ -919,7 +1001,8 @@ defmodule Esc do
   Renders text with the given style applied.
   """
   @spec render(style(), String.t()) :: String.t()
-  def render(%Style{renderer: renderer} = style, text) when is_binary(text) and is_function(renderer, 2) do
+  def render(%Style{renderer: renderer} = style, text)
+      when is_binary(text) and is_function(renderer, 2) do
     renderer.(text, style)
   end
 
@@ -1008,6 +1091,7 @@ defmodule Esc do
   end
 
   defp apply_tabs(text, %Style{tab_width: 0}), do: text
+
   defp apply_tabs(text, %Style{tab_width: width}) do
     String.replace(text, "\t", String.duplicate(" ", width))
   end
@@ -1105,7 +1189,11 @@ defmodule Esc do
       if s.border_top do
         top_left = if s.border_left, do: border.top_left, else: ""
         top_right = if s.border_right, do: border.top_right, else: ""
-        top = border_codes <> top_left <> String.duplicate(border.top, max_width) <> top_right <> reset
+
+        top =
+          border_codes <>
+            top_left <> String.duplicate(border.top, max_width) <> top_right <> reset
+
         [top | result]
       else
         result
@@ -1115,7 +1203,11 @@ defmodule Esc do
       if s.border_bottom do
         bottom_left = if s.border_left, do: border.bottom_left, else: ""
         bottom_right = if s.border_right, do: border.bottom_right, else: ""
-        bottom = border_codes <> bottom_left <> String.duplicate(border.bottom, max_width) <> bottom_right <> reset
+
+        bottom =
+          border_codes <>
+            bottom_left <> String.duplicate(border.bottom, max_width) <> bottom_right <> reset
+
         result ++ [bottom]
       else
         result
@@ -1159,8 +1251,12 @@ defmodule Esc do
               pad = String.duplicate(" ", s.width - current_width)
 
               case s.align_horizontal do
-                :left -> line <> pad
-                :right -> pad <> line
+                :left ->
+                  line <> pad
+
+                :right ->
+                  pad <> line
+
                 :center ->
                   left = div(s.width - current_width, 2)
                   right = s.width - current_width - left
@@ -1188,8 +1284,12 @@ defmodule Esc do
             padding_count = s.height - current_height
 
             case s.align_vertical do
-              :top -> lines ++ List.duplicate(empty_line, padding_count)
-              :bottom -> List.duplicate(empty_line, padding_count) ++ lines
+              :top ->
+                lines ++ List.duplicate(empty_line, padding_count)
+
+              :bottom ->
+                List.duplicate(empty_line, padding_count) ++ lines
+
               :middle ->
                 top = div(padding_count, 2)
                 bottom = padding_count - top

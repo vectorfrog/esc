@@ -198,8 +198,10 @@ defmodule Esc.TableTest do
         |> Table.render()
 
       # Should have both colors
-      assert result =~ "\e[36m"  # cyan
-      assert result =~ "\e[35m"  # magenta
+      # cyan
+      assert result =~ "\e[36m"
+      # magenta
+      assert result =~ "\e[35m"
     end
   end
 
@@ -363,7 +365,8 @@ defmodule Esc.TableTest do
 
       for line <- middle_lines do
         # Each line should have proper border structure
-        assert String.starts_with?(line, "│") or String.starts_with?(line, "├") or String.starts_with?(line, "╭") or String.starts_with?(line, "╰")
+        assert String.starts_with?(line, "│") or String.starts_with?(line, "├") or
+                 String.starts_with?(line, "╭") or String.starts_with?(line, "╰")
       end
     end
   end

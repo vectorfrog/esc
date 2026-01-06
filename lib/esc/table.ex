@@ -305,12 +305,17 @@ defmodule Esc.Table do
 
   # Resolve max_width setting to actual pixels
   defp resolve_max_width(nil, _border, _col_count), do: nil
+
   defp resolve_max_width(:terminal, border, col_count) do
     terminal_width = get_terminal_width()
     # Subtract border overhead: 1 left + 1 right + (col_count - 1) separators + 2 padding per cell
-    border_overhead = if border, do: 2 + (col_count - 1) + (col_count * 2), else: (col_count - 1) * 2
-    max(terminal_width - border_overhead, col_count * 3)  # Minimum 3 chars per column
+    border_overhead =
+      if border, do: 2 + (col_count - 1) + col_count * 2, else: (col_count - 1) * 2
+
+    # Minimum 3 chars per column
+    max(terminal_width - border_overhead, col_count * 3)
   end
+
   defp resolve_max_width(width, _border, _col_count), do: width
 
   # Calculate column widths respecting min/max constraints
@@ -354,7 +359,7 @@ defmodule Esc.Table do
     col_count = length(widths)
 
     # Calculate border/separator overhead
-    overhead = if border, do: 2 + (col_count - 1) + (col_count * 2), else: (col_count - 1) * 2
+    overhead = if border, do: 2 + (col_count - 1) + col_count * 2, else: (col_count - 1) * 2
     available = max(max_width - overhead, col_count * 3)
 
     if total_content <= available do
@@ -375,7 +380,8 @@ defmodule Esc.Table do
       widths
     else
       # Find columns that can be shrunk (wider than minimum)
-      min_width = 8  # Minimum reasonable column width
+      # Minimum reasonable column width
+      min_width = 8
       indexed = Enum.with_index(widths)
 
       # Sort by width descending to shrink widest first
@@ -390,7 +396,12 @@ defmodule Esc.Table do
             # Calculate how much this column can give up
             shrinkable = width - min_width
             # Take a fair share of remaining excess
-            shrink_amount = min(shrinkable, ceil(remaining_excess / max(1, count_shrinkable(acc_widths, min_width))))
+            shrink_amount =
+              min(
+                shrinkable,
+                ceil(remaining_excess / max(1, count_shrinkable(acc_widths, min_width)))
+              )
+
             new_width = max(width - shrink_amount, min_width)
             actual_shrink = width - new_width
 
@@ -401,6 +412,7 @@ defmodule Esc.Table do
       # If still over, do a second pass with proportional reduction on remaining excess
       if Enum.sum(new_widths) > available do
         still_excess = Enum.sum(new_widths) - available
+
         Enum.map(new_widths, fn w ->
           reduction = if w > min_width, do: ceil(still_excess * w / Enum.sum(new_widths)), else: 0
           max(w - reduction, 3)
@@ -426,7 +438,10 @@ defmodule Esc.Table do
 
     # Build bottom line with proper intersections
     bottom_segments = col_widths |> Enum.map(&String.duplicate(border.bottom, &1 + 2))
-    bottom_line = border.bottom_left <> Enum.join(bottom_segments, border.bottom_mid) <> border.bottom_right
+
+    bottom_line =
+      border.bottom_left <> Enum.join(bottom_segments, border.bottom_mid) <> border.bottom_right
+
     bottom_line = apply_border_color(bottom_line, border_color)
 
     # Header separator (between header and data) with proper intersections
@@ -438,7 +453,17 @@ defmodule Esc.Table do
     lines =
       if table.headers != [] do
         header_style = get_effective_header_style(table)
-        header_lines = render_wrapped_row(table.headers, col_widths, table.wrap_mode, border, border_color, fn _col -> header_style end)
+
+        header_lines =
+          render_wrapped_row(
+            table.headers,
+            col_widths,
+            table.wrap_mode,
+            border,
+            border_color,
+            fn _col -> header_style end
+          )
+
         [top_line] ++ header_lines ++ [header_sep]
       else
         [top_line]
@@ -453,7 +478,15 @@ defmodule Esc.Table do
       |> Enum.with_index()
       |> Enum.map(fn {row, row_idx} ->
         style_resolver = get_style_resolver(table, row_idx)
-        {render_wrapped_row(row, col_widths, table.wrap_mode, border, border_color, style_resolver), row_idx}
+
+        {render_wrapped_row(
+           row,
+           col_widths,
+           table.wrap_mode,
+           border,
+           border_color,
+           style_resolver
+         ), row_idx}
       end)
       |> insert_row_separators(table.row_separator, row_sep)
 
@@ -497,7 +530,12 @@ defmodule Esc.Table do
     lines =
       if table.headers != [] do
         header_style = get_effective_header_style(table)
-        header_lines = render_wrapped_row_plain(table.headers, col_widths, table.wrap_mode, fn _col -> header_style end)
+
+        header_lines =
+          render_wrapped_row_plain(table.headers, col_widths, table.wrap_mode, fn _col ->
+            header_style
+          end)
+
         lines ++ header_lines
       else
         lines
@@ -534,6 +572,7 @@ defmodule Esc.Table do
       Enum.zip(wrapped_cells, col_widths)
       |> Enum.map(fn {lines, width} ->
         padding_needed = max_lines - length(lines)
+
         (lines ++ List.duplicate("", padding_needed))
         |> Enum.map(&pad_trailing_display(&1, width))
       end)
@@ -575,7 +614,8 @@ defmodule Esc.Table do
       Enum.zip(wrapped_cells, col_widths)
       |> Enum.map(fn {lines, width} ->
         padding_needed = max_lines - length(lines)
-        lines ++ List.duplicate("", padding_needed)
+
+        (lines ++ List.duplicate("", padding_needed))
         |> Enum.map(&pad_trailing_display(&1, width))
       end)
 

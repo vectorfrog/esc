@@ -109,8 +109,10 @@ defmodule Esc.ColorTest do
       assert Color.ansi256_to_ansi16(15) == 15
 
       # Extended palette maps to closest basic color
-      assert Color.ansi256_to_ansi16(196) == 1  # Bright red -> red
-      assert Color.ansi256_to_ansi16(21) == 4   # Blue-ish -> blue
+      # Bright red -> red
+      assert Color.ansi256_to_ansi16(196) == 1
+      # Blue-ish -> blue
+      assert Color.ansi256_to_ansi16(21) == 4
     end
   end
 
@@ -132,11 +134,12 @@ defmodule Esc.ColorTest do
 
   describe "complete colors" do
     test "complete_color provides all three representations" do
-      color = Color.complete(
-        ansi: :red,
-        ansi256: 196,
-        true_color: {255, 0, 0}
-      )
+      color =
+        Color.complete(
+          ansi: :red,
+          ansi256: 196,
+          true_color: {255, 0, 0}
+        )
 
       assert color.ansi == :red
       assert color.ansi256 == 196
@@ -144,11 +147,12 @@ defmodule Esc.ColorTest do
     end
 
     test "resolve_complete returns appropriate value for profile" do
-      color = Color.complete(
-        ansi: :red,
-        ansi256: 196,
-        true_color: {255, 0, 0}
-      )
+      color =
+        Color.complete(
+          ansi: :red,
+          ansi256: 196,
+          true_color: {255, 0, 0}
+        )
 
       assert Color.resolve_complete(color, :ansi) == :red
       assert Color.resolve_complete(color, :ansi256) == 196
@@ -156,10 +160,11 @@ defmodule Esc.ColorTest do
     end
 
     test "resolve_complete falls back when level not specified" do
-      color = Color.complete(
-        ansi: :red,
-        true_color: {255, 0, 0}
-      )
+      color =
+        Color.complete(
+          ansi: :red,
+          true_color: {255, 0, 0}
+        )
 
       # Missing ansi256 should fall back to ansi
       assert Color.resolve_complete(color, :ansi256) == :red

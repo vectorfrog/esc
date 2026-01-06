@@ -248,7 +248,11 @@ defmodule Esc.MultiSelect do
   """
   @spec marker_styles(t(), Esc.Style.t() | nil, Esc.Style.t() | nil) :: t()
   def marker_styles(%__MODULE__{} = multi_select, selected_style, unselected_style) do
-    %{multi_select | selected_marker_style: selected_style, unselected_marker_style: unselected_style}
+    %{
+      multi_select
+      | selected_marker_style: selected_style,
+        unselected_marker_style: unselected_style
+    }
   end
 
   # ===========================================================================
@@ -389,8 +393,17 @@ defmodule Esc.MultiSelect do
 
     # Get filtered items then paginate
     filtered_indices = Esc.Filter.matching_indices(multi_select.items, multi_select.filter_text)
-    page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, multi_select.current_page)
-    total_pages = Esc.Filter.total_pages(multi_select.items, multi_select.filter_text, multi_select.page_size)
+
+    page_indices =
+      Esc.Filter.page_indices(
+        multi_select.items,
+        multi_select.filter_text,
+        multi_select.page_size,
+        multi_select.current_page
+      )
+
+    total_pages =
+      Esc.Filter.total_pages(multi_select.items, multi_select.filter_text, multi_select.page_size)
 
     items_output =
       page_indices
@@ -435,13 +448,15 @@ defmodule Esc.MultiSelect do
 
     header_parts =
       if multi_select.filter_mode or multi_select.filter_text != "" do
-        filter_line = Esc.Filter.render_filter_input(
-          multi_select.filter_text,
-          multi_select.filter_mode,
-          prompt_style: filter_style,
-          match_count: {length(filtered_indices), length(multi_select.items)},
-          count_style: filter_style
-        )
+        filter_line =
+          Esc.Filter.render_filter_input(
+            multi_select.filter_text,
+            multi_select.filter_mode,
+            prompt_style: filter_style,
+            match_count: {length(filtered_indices), length(multi_select.items)},
+            count_style: filter_style
+          )
+
         header_parts ++ [filter_line]
       else
         header_parts
@@ -449,7 +464,11 @@ defmodule Esc.MultiSelect do
 
     header_parts =
       if total_pages > 1 do
-        pagination = Esc.Filter.render_pagination(multi_select.current_page, total_pages, style: filter_style)
+        pagination =
+          Esc.Filter.render_pagination(multi_select.current_page, total_pages,
+            style: filter_style
+          )
+
         header_parts ++ [pagination]
       else
         header_parts
@@ -619,6 +638,7 @@ defmodule Esc.MultiSelect do
   end
 
   defp delete_filter_char(%{filter_text: ""} = multi_select), do: multi_select
+
   defp delete_filter_char(multi_select) do
     new_filter = String.slice(multi_select.filter_text, 0..-2//1)
     %{multi_select | filter_text: new_filter}
@@ -643,13 +663,37 @@ defmodule Esc.MultiSelect do
   end
 
   defp move_up(%__MODULE__{} = multi_select) do
-    page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, multi_select.current_page)
+    page_indices =
+      Esc.Filter.page_indices(
+        multi_select.items,
+        multi_select.filter_text,
+        multi_select.page_size,
+        multi_select.current_page
+      )
+
     current_pos = Enum.find_index(page_indices, &(&1 == multi_select.cursor_index)) || 0
 
     if current_pos == 0 do
-      total_pages = Esc.Filter.total_pages(multi_select.items, multi_select.filter_text, multi_select.page_size)
-      new_page = if multi_select.current_page == 0, do: total_pages - 1, else: multi_select.current_page - 1
-      new_page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, new_page)
+      total_pages =
+        Esc.Filter.total_pages(
+          multi_select.items,
+          multi_select.filter_text,
+          multi_select.page_size
+        )
+
+      new_page =
+        if multi_select.current_page == 0,
+          do: total_pages - 1,
+          else: multi_select.current_page - 1
+
+      new_page_indices =
+        Esc.Filter.page_indices(
+          multi_select.items,
+          multi_select.filter_text,
+          multi_select.page_size,
+          new_page
+        )
+
       new_index = List.last(new_page_indices) || multi_select.cursor_index
       %{multi_select | cursor_index: new_index, current_page: new_page}
     else
@@ -659,13 +703,37 @@ defmodule Esc.MultiSelect do
   end
 
   defp move_down(%__MODULE__{} = multi_select) do
-    page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, multi_select.current_page)
+    page_indices =
+      Esc.Filter.page_indices(
+        multi_select.items,
+        multi_select.filter_text,
+        multi_select.page_size,
+        multi_select.current_page
+      )
+
     current_pos = Enum.find_index(page_indices, &(&1 == multi_select.cursor_index)) || 0
 
     if current_pos == length(page_indices) - 1 do
-      total_pages = Esc.Filter.total_pages(multi_select.items, multi_select.filter_text, multi_select.page_size)
-      new_page = if multi_select.current_page == total_pages - 1, do: 0, else: multi_select.current_page + 1
-      new_page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, new_page)
+      total_pages =
+        Esc.Filter.total_pages(
+          multi_select.items,
+          multi_select.filter_text,
+          multi_select.page_size
+        )
+
+      new_page =
+        if multi_select.current_page == total_pages - 1,
+          do: 0,
+          else: multi_select.current_page + 1
+
+      new_page_indices =
+        Esc.Filter.page_indices(
+          multi_select.items,
+          multi_select.filter_text,
+          multi_select.page_size,
+          new_page
+        )
+
       new_index = List.first(new_page_indices) || multi_select.cursor_index
       %{multi_select | cursor_index: new_index, current_page: new_page}
     else
@@ -675,24 +743,51 @@ defmodule Esc.MultiSelect do
   end
 
   defp move_home(%__MODULE__{} = multi_select) do
-    page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, 0)
+    page_indices =
+      Esc.Filter.page_indices(
+        multi_select.items,
+        multi_select.filter_text,
+        multi_select.page_size,
+        0
+      )
+
     new_index = List.first(page_indices) || 0
     %{multi_select | cursor_index: new_index, current_page: 0}
   end
 
   defp move_end(%__MODULE__{} = multi_select) do
-    total_pages = Esc.Filter.total_pages(multi_select.items, multi_select.filter_text, multi_select.page_size)
+    total_pages =
+      Esc.Filter.total_pages(multi_select.items, multi_select.filter_text, multi_select.page_size)
+
     last_page = total_pages - 1
-    page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, last_page)
+
+    page_indices =
+      Esc.Filter.page_indices(
+        multi_select.items,
+        multi_select.filter_text,
+        multi_select.page_size,
+        last_page
+      )
+
     new_index = List.last(page_indices) || length(multi_select.items) - 1
     %{multi_select | cursor_index: new_index, current_page: last_page}
   end
 
   defp next_page(%__MODULE__{} = multi_select) do
-    total_pages = Esc.Filter.total_pages(multi_select.items, multi_select.filter_text, multi_select.page_size)
+    total_pages =
+      Esc.Filter.total_pages(multi_select.items, multi_select.filter_text, multi_select.page_size)
+
     if multi_select.current_page < total_pages - 1 do
       new_page = multi_select.current_page + 1
-      page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, new_page)
+
+      page_indices =
+        Esc.Filter.page_indices(
+          multi_select.items,
+          multi_select.filter_text,
+          multi_select.page_size,
+          new_page
+        )
+
       new_index = List.first(page_indices) || multi_select.cursor_index
       %{multi_select | current_page: new_page, cursor_index: new_index}
     else
@@ -703,7 +798,15 @@ defmodule Esc.MultiSelect do
   defp prev_page(%__MODULE__{} = multi_select) do
     if multi_select.current_page > 0 do
       new_page = multi_select.current_page - 1
-      page_indices = Esc.Filter.page_indices(multi_select.items, multi_select.filter_text, multi_select.page_size, new_page)
+
+      page_indices =
+        Esc.Filter.page_indices(
+          multi_select.items,
+          multi_select.filter_text,
+          multi_select.page_size,
+          new_page
+        )
+
       new_index = List.first(page_indices) || multi_select.cursor_index
       %{multi_select | current_page: new_page, cursor_index: new_index}
     else
@@ -783,8 +886,10 @@ defmodule Esc.MultiSelect do
       "G" -> :end_key
       "]" -> :page_forward
       "[" -> :page_backward
-      <<6>> -> :page_forward   # Ctrl+F
-      <<2>> -> :page_backward  # Ctrl+B
+      # Ctrl+F
+      <<6>> -> :page_forward
+      # Ctrl+B
+      <<2>> -> :page_backward
       "a" -> :select_all
       "n" -> :select_none
       "q" -> :cancel
@@ -796,21 +901,39 @@ defmodule Esc.MultiSelect do
 
   defp read_filter_key do
     case read_char() do
-      "\e" -> :escape
-      "\r" -> :enter
-      "\n" -> :enter
-      <<127>> -> :backspace
-      <<8>> -> :backspace
-      <<21>> -> :clear_line
-      <<3>> -> :escape
-      :eof -> :escape
+      "\e" ->
+        :escape
+
+      "\r" ->
+        :enter
+
+      "\n" ->
+        :enter
+
+      <<127>> ->
+        :backspace
+
+      <<8>> ->
+        :backspace
+
+      <<21>> ->
+        :clear_line
+
+      <<3>> ->
+        :escape
+
+      :eof ->
+        :escape
+
       char when is_binary(char) ->
         if String.printable?(char) and String.length(char) == 1 do
           {:char, char}
         else
           :unknown
         end
-      _ -> :unknown
+
+      _ ->
+        :unknown
     end
   end
 
@@ -822,21 +945,32 @@ defmodule Esc.MultiSelect do
     case read_char() do
       "[" ->
         case read_char() do
-          "A" -> :up
-          "B" -> :down
-          "H" -> :home
-          "F" -> :end_key
+          "A" ->
+            :up
+
+          "B" ->
+            :down
+
+          "H" ->
+            :home
+
+          "F" ->
+            :end_key
+
           "1" ->
             case read_char() do
               "~" -> :home
               _ -> :unknown
             end
+
           "4" ->
             case read_char() do
               "~" -> :end_key
               _ -> :unknown
             end
-          _ -> :unknown
+
+          _ ->
+            :unknown
         end
 
       _ ->

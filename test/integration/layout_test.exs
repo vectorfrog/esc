@@ -177,7 +177,8 @@ defmodule Esc.Integration.LayoutTest do
       # Should have leading spaces for centering
       assert String.trim(stripped) == "Hi"
       left_spaces = String.length(stripped) - String.length(String.trim_leading(stripped))
-      assert left_spaces == 9  # (20 - 2) / 2
+      # (20 - 2) / 2
+      assert left_spaces == 9
     end
 
     test "place_vertical positions text vertically" do

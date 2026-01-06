@@ -23,8 +23,20 @@ defmodule Esc.Theme.Palette do
 
   alias Esc.Theme
 
-  @themes [:dracula, :nord, :gruvbox, :one, :solarized, :monokai,
-           :material, :github, :aura, :dolphin, :chalk, :cobalt]
+  @themes [
+    :dracula,
+    :nord,
+    :gruvbox,
+    :one,
+    :solarized,
+    :monokai,
+    :material,
+    :github,
+    :aura,
+    :dolphin,
+    :chalk,
+    :cobalt
+  ]
 
   @doc """
   Returns all available theme names.

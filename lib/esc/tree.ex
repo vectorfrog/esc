@@ -232,12 +232,13 @@ defmodule Esc.Tree do
   end
 
   defp merge_styles(subtree, parent) do
-    %{subtree |
-      enumerator: subtree.enumerator,
-      root_style: subtree.root_style || parent.root_style,
-      item_style: subtree.item_style || parent.item_style,
-      enumerator_style: subtree.enumerator_style || parent.enumerator_style,
-      use_theme: subtree.use_theme && parent.use_theme
+    %{
+      subtree
+      | enumerator: subtree.enumerator,
+        root_style: subtree.root_style || parent.root_style,
+        item_style: subtree.item_style || parent.item_style,
+        enumerator_style: subtree.enumerator_style || parent.enumerator_style,
+        use_theme: subtree.use_theme && parent.use_theme
     }
   end
 

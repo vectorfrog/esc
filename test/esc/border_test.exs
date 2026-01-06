@@ -81,16 +81,17 @@ defmodule Esc.BorderTest do
 
   describe "custom/1" do
     test "creates a custom border from keyword list" do
-      border = Border.custom(
-        top: "~",
-        bottom: "~",
-        left: "!",
-        right: "!",
-        top_left: "*",
-        top_right: "*",
-        bottom_left: "*",
-        bottom_right: "*"
-      )
+      border =
+        Border.custom(
+          top: "~",
+          bottom: "~",
+          left: "!",
+          right: "!",
+          top_left: "*",
+          top_right: "*",
+          bottom_left: "*",
+          bottom_right: "*"
+        )
 
       assert border.top == "~"
       assert border.left == "!"

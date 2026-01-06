@@ -255,8 +255,14 @@ defmodule Esc.Color do
     avg = div(r + g + b, 3)
 
     cond do
-      avg < 8 -> 16   # Black
-      avg > 248 -> 231  # White
+      # Black
+      avg < 8 ->
+        16
+
+      # White
+      avg > 248 ->
+        231
+
       true ->
         # Grayscale ramp is 232-255 (24 shades)
         # Each step is about 10 units (256/24 ≈ 10.67)
@@ -270,7 +276,7 @@ defmodule Esc.Color do
     ri = color_cube_index(r)
     gi = color_cube_index(g)
     bi = color_cube_index(b)
-    16 + (36 * ri) + (6 * gi) + bi
+    16 + 36 * ri + 6 * gi + bi
   end
 
   defp color_cube_index(value) do
@@ -302,10 +308,14 @@ defmodule Esc.Color do
   def ansi256_to_ansi16(n) when n in 232..255 do
     # Grayscale ramp
     gray = n - 232
+
     cond do
-      gray < 6 -> 0   # Black
-      gray < 18 -> 7  # White (light gray)
-      true -> 15      # Bright white
+      # Black
+      gray < 6 -> 0
+      # White (light gray)
+      gray < 18 -> 7
+      # Bright white
+      true -> 15
     end
   end
 
@@ -326,28 +336,45 @@ defmodule Esc.Color do
   defp nearest_ansi16({r, g, b}) do
     # Find which basic color is closest
     colors = [
-      {0, {0, 0, 0}},       # black
-      {1, {170, 0, 0}},     # red
-      {2, {0, 170, 0}},     # green
-      {3, {170, 85, 0}},    # yellow/brown
-      {4, {0, 0, 170}},     # blue
-      {5, {170, 0, 170}},   # magenta
-      {6, {0, 170, 170}},   # cyan
-      {7, {170, 170, 170}}, # white
-      {8, {85, 85, 85}},    # bright black
-      {9, {255, 85, 85}},   # bright red
-      {10, {85, 255, 85}},  # bright green
-      {11, {255, 255, 85}}, # bright yellow
-      {12, {85, 85, 255}},  # bright blue
-      {13, {255, 85, 255}}, # bright magenta
-      {14, {85, 255, 255}}, # bright cyan
-      {15, {255, 255, 255}} # bright white
+      # black
+      {0, {0, 0, 0}},
+      # red
+      {1, {170, 0, 0}},
+      # green
+      {2, {0, 170, 0}},
+      # yellow/brown
+      {3, {170, 85, 0}},
+      # blue
+      {4, {0, 0, 170}},
+      # magenta
+      {5, {170, 0, 170}},
+      # cyan
+      {6, {0, 170, 170}},
+      # white
+      {7, {170, 170, 170}},
+      # bright black
+      {8, {85, 85, 85}},
+      # bright red
+      {9, {255, 85, 85}},
+      # bright green
+      {10, {85, 255, 85}},
+      # bright yellow
+      {11, {255, 255, 85}},
+      # bright blue
+      {12, {85, 85, 255}},
+      # bright magenta
+      {13, {255, 85, 255}},
+      # bright cyan
+      {14, {85, 255, 255}},
+      # bright white
+      {15, {255, 255, 255}}
     ]
 
-    {index, _} = Enum.min_by(colors, fn {_idx, {cr, cg, cb}} ->
-      # Euclidean distance in RGB space
-      :math.sqrt(:math.pow(r - cr, 2) + :math.pow(g - cg, 2) + :math.pow(b - cb, 2))
-    end)
+    {index, _} =
+      Enum.min_by(colors, fn {_idx, {cr, cg, cb}} ->
+        # Euclidean distance in RGB space
+        :math.sqrt(:math.pow(r - cr, 2) + :math.pow(g - cg, 2) + :math.pow(b - cb, 2))
+      end)
 
     index
   end

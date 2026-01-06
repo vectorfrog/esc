@@ -175,11 +175,12 @@ defmodule Esc.List do
   end
 
   defp merge_styles(nested, parent) do
-    %{nested |
-      enumerator_style: nested.enumerator_style || parent.enumerator_style,
-      item_style: nested.item_style || parent.item_style,
-      indent: parent.indent,
-      use_theme: nested.use_theme && parent.use_theme
+    %{
+      nested
+      | enumerator_style: nested.enumerator_style || parent.enumerator_style,
+        item_style: nested.item_style || parent.item_style,
+        indent: parent.indent,
+        use_theme: nested.use_theme && parent.use_theme
     }
   end
 

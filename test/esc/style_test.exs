@@ -12,7 +12,8 @@ defmodule Esc.StyleTest do
 
       derived =
         style()
-        |> foreground(:blue)  # Override red
+        # Override red
+        |> foreground(:blue)
         |> inherit(base)
 
       # Should have blue foreground (not inherited)
@@ -194,8 +195,10 @@ defmodule Esc.StyleTest do
         |> render("Text")
 
       # Should have bold but no red color
-      assert result =~ "\e[1m"  # bold
-      refute result =~ "\e[31m" # red foreground
+      # bold
+      assert result =~ "\e[1m"
+      # red foreground
+      refute result =~ "\e[31m"
     end
   end
 end

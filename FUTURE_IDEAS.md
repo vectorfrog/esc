@@ -28,19 +28,24 @@ Potential additions to the Esc terminal styling library.
 - [ ] **Diff** - Side-by-side or unified diff viewer for comparing text/code changes.
 - [ ] **KeyValue** - Aligned key-value pair display (like `git config --list` output).
 - [ ] **Sparkline** - Inline mini charts using block characters (▁▂▃▅▇) for quick data visualization.
+- [ ] **Chart** - Multi-line series plotting for visualizing trends, time series, or comparing datasets.
+- [ ] **Canvas** - Free-form drawing surface for placing characters at arbitrary x,y positions.
 
 ## Layout
 
 - [ ] **Columns** - Side-by-side content layout with configurable widths and gutters.
+- [ ] **Row/Column DSL** - Declarative grid layout system (like Ratatouille's `row`/`column` elements).
 - [ ] **Divider** - Horizontal and vertical separators with optional centered labels.
 - [ ] **Panel / Card** - Bordered content containers with headers, footers, and padding.
 - [ ] **Tabs** - Tabbed content switching with keyboard navigation between panes.
+- [ ] **Overlay** - Floating content layer for modals, dialogs, and popups positioned over other content.
 
 ## Navigation
 
 - [ ] **Breadcrumbs** - Path or hierarchy display with separators (Home > Projects > Esc).
 - [x] **Pagination** - Page controls for navigating large datasets with page size options. [spec](plans/select-pagination/spec.md) | [plan](plans/select-pagination/plan.md)
 - [ ] **CommandPalette** - Fuzzy-searchable command menu (like VS Code's Ctrl+Shift+P) for action discovery.
+- [ ] **StatusBar** - Horizontal bar for displaying status, hints, or menu items at top/bottom of screen.
 
 ## Advanced Select
 
@@ -53,6 +58,17 @@ Potential additions to the Esc terminal styling library.
 - [ ] **KeyboardHints** - Display available keyboard shortcuts contextually (like vim's which-key plugin).
 - [ ] **FuzzyFilter** - Add fuzzy matching option to existing filter mode (beyond glob patterns).
 - [ ] **Scrollable** - Wrapper component for scrolling long content with visual scrollbar indicator.
+
+## Out of Scope
+
+ESC is a **styling library**, not a full TUI framework. The following features (found in frameworks like Ratatouille) are intentionally out of scope:
+
+- **Runtime/App** - TEA application loops with init/update/render callbacks
+- **Events** - Continuous keyboard, mouse, and resize event handling
+- **Subscriptions** - Recurring event streams for animations or polling
+- **Commands** - Async operation dispatching with callbacks
+
+For full TUI applications, use a dedicated framework like Ratatouille or build on top of ex_termbox directly.
 
 ---
 

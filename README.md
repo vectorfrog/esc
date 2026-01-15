@@ -45,7 +45,7 @@ Add `esc` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:esc, "~> 0.8.0"}
+    {:esc, "~> 0.9.0"}
   ]
 end
 ```
@@ -357,6 +357,7 @@ L.new(["First item", "Second item", "Third item"])
 ```
 
 Output:
+
 ```text
 1. First item
 2. Second item
@@ -555,9 +556,58 @@ Esc.themes()
 #     :material, :github, :aura, :dolphin, :chalk, :cobalt]
 ```
 
-### Theme Colors
+### Theme-Aware Styles
 
-Themes provide semantic colors for common UI purposes:
+The easiest way to use themes is by creating a style with a theme attached. Color atoms like `:red`, `:cyan`, `:bright_magenta` automatically resolve to the theme's RGB values:
+
+```elixir
+# Create a style with Nord theme attached
+style(:nord)
+|> foreground(:red)        # Uses Nord's red (191, 97, 106)
+|> background(:cyan)       # Uses Nord's cyan (136, 192, 208)
+|> render("Themed text")
+
+# Compare to Dracula theme
+style(:dracula)
+|> foreground(:red)        # Uses Dracula's red (255, 85, 85)
+|> background(:cyan)       # Uses Dracula's cyan (139, 233, 253)
+|> render("Different colors!")
+
+# Without a theme, color atoms work as standard ANSI
+style()
+|> foreground(:red)        # Standard ANSI red
+|> render("Classic red")
+```
+
+**All 16 ANSI colors work:**
+
+- `:black`, `:red`, `:green`, `:yellow`, `:blue`, `:magenta`, `:cyan`, `:white`
+- `:bright_black`, `:bright_red`, `:bright_green`, `:bright_yellow`, `:bright_blue`, `:bright_magenta`, `:bright_cyan`, `:bright_white`
+
+**Semantic colors also work:**
+
+- `:header` - Headers, titles (cyan)
+- `:emphasis` - Important text (blue)
+- `:success` - Success messages (green)
+- `:warning` - Warning messages (yellow)
+- `:error` - Error messages (red)
+- `:muted` - Subdued text, borders (gray)
+
+```elixir
+# Using semantic colors with themed style
+style(:nord)
+|> foreground(:error) |> render("Error message")
+
+style(:nord)
+|> foreground(:success) |> render("Success!")
+
+style(:nord)
+|> foreground(:warning) |> render("Warning")
+```
+
+### Global Theme Colors
+
+You can also set a global theme and use theme-specific functions:
 
 ```elixir
 Esc.set_theme(:nord)
@@ -573,14 +623,6 @@ style() |> Esc.theme_foreground(:muted) |> render("Subdued text")
 Esc.theme_color(:error)    # => {191, 97, 106}
 Esc.theme_color(:success)  # => {163, 190, 140}
 ```
-
-**Semantic colors:**
-- `:header` - Headers, titles (cyan)
-- `:emphasis` - Important text (blue)
-- `:success` - Success messages (green)
-- `:warning` - Warning messages (yellow)
-- `:error` - Error messages (red)
-- `:muted` - Subdued text, borders (gray)
 
 ### Auto-Themed Components
 

@@ -25,6 +25,18 @@ defmodule Esc do
   - ANSI 256 palette: integers `0..255`
   - True color: `{r, g, b}` tuples or hex strings like `"#ff5733"`
 
+  ## Theme-Aware Styling
+
+  Create styles with themes attached for automatic color resolution:
+
+      # Color atoms resolve to theme RGB values
+      style(:nord) |> foreground(:red) |> render("Nord red")
+      style(:dracula) |> foreground(:red) |> render("Dracula red")
+
+      # All 16 ANSI colors and semantic colors work
+      style(:nord) |> foreground(:error) |> render("Error!")
+      style(:nord) |> foreground(:bright_cyan) |> render("Info")
+
   ## Borders
 
   Available border styles: `:normal`, `:rounded`, `:thick`, `:double`, `:hidden`

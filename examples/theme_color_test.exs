@@ -45,11 +45,19 @@ IO.puts("4. All ANSI color names (Nord):")
 end)
 
 IO.puts("")
-IO.puts("5. Semantic colors (Nord):")
+IO.puts("5. Semantic colors (Nord theme):")
 
 [:header, :emphasis, :warning, :error, :success, :muted]
 |> Enum.each(fn color ->
   IO.puts(style(:nord) |> foreground(color) |> render("  #{color}"))
+end)
+
+IO.puts("")
+IO.puts("6. Semantic colors (no theme - ANSI fallback):")
+
+[:header, :emphasis, :warning, :error, :success, :muted]
+|> Enum.each(fn color ->
+  IO.puts(style() |> foreground(color) |> render("  #{color}"))
 end)
 
 IO.puts("")

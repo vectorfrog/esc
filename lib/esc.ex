@@ -1379,7 +1379,16 @@ defmodule Esc do
 
   # Theme-aware color resolution
   # When style has a theme and color is an atom, look up in theme.
+  # When no theme, semantic colors fall back to standard ANSI.
   # Otherwise pass through unchanged.
+
+  # Fallback semantic colors to standard ANSI when no theme
+  defp resolve_color(%Style{theme: nil}, :header), do: :cyan
+  defp resolve_color(%Style{theme: nil}, :emphasis), do: :blue
+  defp resolve_color(%Style{theme: nil}, :warning), do: :yellow
+  defp resolve_color(%Style{theme: nil}, :error), do: :red
+  defp resolve_color(%Style{theme: nil}, :success), do: :green
+  defp resolve_color(%Style{theme: nil}, :muted), do: :bright_black
   defp resolve_color(%Style{theme: nil}, color), do: color
 
   defp resolve_color(%Style{theme: theme}, color) when is_atom(color) do

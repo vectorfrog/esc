@@ -584,26 +584,42 @@ style()
 - `:black`, `:red`, `:green`, `:yellow`, `:blue`, `:magenta`, `:cyan`, `:white`
 - `:bright_black`, `:bright_red`, `:bright_green`, `:bright_yellow`, `:bright_blue`, `:bright_magenta`, `:bright_cyan`, `:bright_white`
 
-**Semantic colors also work:**
+**Semantic colors work everywhere** - with or without themes:
 
-- `:header` - Headers, titles (cyan)
-- `:emphasis` - Important text (blue)
-- `:success` - Success messages (green)
-- `:warning` - Warning messages (yellow)
-- `:error` - Error messages (red)
-- `:muted` - Subdued text, borders (gray)
+- `:header` - Headers, titles
+- `:emphasis` - Important text
+- `:success` - Success messages
+- `:warning` - Warning messages
+- `:error` - Error messages
+- `:muted` - Subdued text, borders
 
 ```elixir
-# Using semantic colors with themed style
+# With theme: semantic colors use theme RGB values
 style(:nord)
-|> foreground(:error) |> render("Error message")
+|> foreground(:error) |> render("Error message")     # Nord's red (191, 97, 106)
 
-style(:nord)
-|> foreground(:success) |> render("Success!")
+style(:dracula)
+|> foreground(:error) |> render("Error message")     # Dracula's red (255, 85, 85)
 
-style(:nord)
-|> foreground(:warning) |> render("Warning")
+# Without theme: semantic colors fall back to standard ANSI
+style()
+|> foreground(:error) |> render("Error message")     # Standard ANSI red
+
+style()
+|> foreground(:success) |> render("Success!")        # Standard ANSI green
+
+style()
+|> foreground(:warning) |> render("Warning")         # Standard ANSI yellow
 ```
+
+**Semantic color ANSI fallbacks** (when no theme is set):
+
+- `:error` → `:red`
+- `:success` → `:green`
+- `:warning` → `:yellow`
+- `:header` → `:cyan`
+- `:emphasis` → `:blue`
+- `:muted` → `:bright_black`
 
 ### Global Theme Colors
 

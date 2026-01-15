@@ -42,19 +42,50 @@ defmodule Esc do
   @spec style() :: style()
   def style, do: %Style{}
 
+  @doc """
+  Creates a new style with a theme attached.
+
+  When a theme is attached, color atoms (`:red`, `:bright_magenta`, etc.) are
+  resolved to the theme's RGB values instead of standard ANSI codes.
+
+  ## Examples
+
+      # With theme name
+      style(:nord) |> foreground(:red) |> render("Error")
+
+      # With theme struct
+      theme = Esc.Theme.Palette.get(:dracula)
+      style(theme) |> foreground(:cyan) |> render("Info")
+  """
+  @spec style(atom() | Theme.t()) :: style()
+  def style(theme_name) when is_atom(theme_name) do
+    case Theme.Palette.get(theme_name) do
+      nil -> raise ArgumentError, "unknown theme: #{inspect(theme_name)}"
+      theme -> %Style{theme: theme}
+    end
+  end
+
+  def style(%Theme{} = theme), do: %Style{theme: theme}
+
   # Colors
 
   @doc """
   Sets the foreground (text) color.
+
+  When the style has a theme attached, color atoms (`:red`, `:bright_magenta`, etc.)
+  are resolved to the theme's RGB values. Without a theme, atoms pass through
+  for standard ANSI rendering.
   """
   @spec foreground(style(), Style.color()) :: style()
-  def foreground(%Style{} = s, color), do: %{s | foreground: color}
+  def foreground(%Style{} = s, color), do: %{s | foreground: resolve_color(s, color)}
 
   @doc """
   Sets the background color.
+
+  When the style has a theme attached, color atoms are resolved to theme RGB values.
   """
   @spec background(style(), Style.color()) :: style()
-  def background(%Style{} = s, color), do: %{s | background: color}
+  def background(%Style{} = s, color), do: %{s | background: resolve_color(s, color)}
 
   # Text formatting
 
@@ -176,15 +207,21 @@ defmodule Esc do
 
   @doc """
   Sets the border foreground color.
+
+  When the style has a theme attached, color atoms are resolved to theme RGB values.
   """
   @spec border_foreground(style(), Style.color()) :: style()
-  def border_foreground(%Style{} = s, color), do: %{s | border_foreground: color}
+  def border_foreground(%Style{} = s, color),
+    do: %{s | border_foreground: resolve_color(s, color)}
 
   @doc """
   Sets the border background color.
+
+  When the style has a theme attached, color atoms are resolved to theme RGB values.
   """
   @spec border_background(style(), Style.color()) :: style()
-  def border_background(%Style{} = s, color), do: %{s | border_background: color}
+  def border_background(%Style{} = s, color),
+    do: %{s | border_background: resolve_color(s, color)}
 
   @doc """
   Enables or disables the top border.
@@ -1327,4 +1364,15 @@ defmodule Esc do
     end)
     |> elem(0)
   end
+
+  # Theme-aware color resolution
+  # When style has a theme and color is an atom, look up in theme.
+  # Otherwise pass through unchanged.
+  defp resolve_color(%Style{theme: nil}, color), do: color
+
+  defp resolve_color(%Style{theme: theme}, color) when is_atom(color) do
+    Theme.color(theme, color) || color
+  end
+
+  defp resolve_color(_style, color), do: color
 end

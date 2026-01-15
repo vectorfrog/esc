@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-01-15
+
+### Added
+
+- **Theme-aware color resolution**: Use simple ANSI color names that resolve to theme RGB values
+  - New `style/1` function: `style(:nord)` creates a style with theme attached
+  - Color atoms (`:red`, `:cyan`, `:bright_magenta`, etc.) resolve to theme RGB values
+  - Works with all 16 ANSI colors: `:black`, `:red`, `:green`, `:yellow`, `:blue`, `:magenta`, `:cyan`, `:white`, and their `bright_*` variants
+  - Semantic colors (`:header`, `:emphasis`, `:warning`, `:error`, `:success`, `:muted`) also supported
+  - Without a theme, color atoms pass through for standard ANSI rendering
+  - Demo script at `examples/theme_color_test.exs`
+
 ## [0.8.0] - 2026-01-03
 
 ### Added

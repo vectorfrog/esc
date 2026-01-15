@@ -114,6 +114,26 @@ defmodule Esc.Theme do
     end
   end
 
+  # Map friendly color names to ANSI field names
+  @color_to_ansi %{
+    black: :ansi_0,
+    red: :ansi_1,
+    green: :ansi_2,
+    yellow: :ansi_3,
+    blue: :ansi_4,
+    magenta: :ansi_5,
+    cyan: :ansi_6,
+    white: :ansi_7,
+    bright_black: :ansi_8,
+    bright_red: :ansi_9,
+    bright_green: :ansi_10,
+    bright_yellow: :ansi_11,
+    bright_blue: :ansi_12,
+    bright_magenta: :ansi_13,
+    bright_cyan: :ansi_14,
+    bright_white: :ansi_15
+  }
+
   # Default semantic color derivations from ANSI palette
   defp derive_semantic_color(theme, :header), do: theme.ansi_6
   defp derive_semantic_color(theme, :emphasis), do: theme.ansi_4
@@ -121,5 +141,12 @@ defmodule Esc.Theme do
   defp derive_semantic_color(theme, :error), do: theme.ansi_1
   defp derive_semantic_color(theme, :success), do: theme.ansi_2
   defp derive_semantic_color(theme, :muted), do: theme.ansi_8
-  defp derive_semantic_color(_theme, _name), do: nil
+
+  # Map friendly color names to ANSI slots
+  defp derive_semantic_color(theme, name) do
+    case Map.get(@color_to_ansi, name) do
+      nil -> nil
+      ansi_field -> Map.get(theme, ansi_field)
+    end
+  end
 end

@@ -1,24 +1,23 @@
 #!/usr/bin/env elixir
 # Theme demo script - run with: mix run examples/theme_demo.exs
 
-alias Esc.{Table, Tree, List}
+alias Esc.Theme
 
 # Helper to print section headers
 defmodule Demo do
   def section(title) do
-    IO.puts("\n" <> String.duplicate("═", 60))
+    IO.puts("\n" <> String.duplicate("=", 60))
     IO.puts("  #{title}")
-    IO.puts(String.duplicate("═", 60) <> "\n")
+    IO.puts(String.duplicate("=", 60) <> "\n")
   end
 
   def theme_preview(name) do
-    Esc.set_theme(name)
-    theme = Esc.get_theme()
+    theme = Theme.Palette.get(name)
 
     IO.puts("Theme: #{name}")
-    IO.puts(String.duplicate("─", 40))
+    IO.puts(String.duplicate("-", 40))
 
-    # Show color palette
+    # Show color palette using style(theme)
     colors = [
       {:error, "Error"},
       {:warning, "Warning"},
@@ -29,30 +28,23 @@ defmodule Demo do
     ]
 
     for {semantic, label} <- colors do
-      color = Esc.Theme.color(theme, semantic)
-      text = Esc.style() |> Esc.foreground(color) |> Esc.render(String.pad_trailing(label, 12))
+      text =
+        Esc.style(theme)
+        |> Esc.foreground(semantic)
+        |> Esc.render(String.pad_trailing(label, 12))
+
       IO.write(text)
     end
-    IO.puts("")
 
-    # Show a sample table
-    Table.new()
-    |> Table.headers(["Status", "Count"])
-    |> Table.row(["Active", "42"])
-    |> Table.row(["Pending", "17"])
-    |> Table.border(:rounded)
-    |> Table.render()
-    |> IO.puts()
-
-    IO.puts("")
+    IO.puts("\n")
   end
 end
 
 Demo.section("Theme Feature Demo")
 
 IO.puts("""
-Esc now supports 12 built-in themes from popular terminal color schemes.
-Set a theme with: Esc.set_theme(:theme_name)
+Esc supports 12 built-in themes from popular terminal color schemes.
+Use themes with: Esc.style(:theme_name) |> Esc.foreground(:color)
 
 Available themes: #{Enum.join(Esc.themes(), ", ")}
 """)
@@ -66,7 +58,7 @@ end
 
 Demo.section("Semantic Colors")
 
-Esc.set_theme(:nord)
+theme = Theme.Palette.get(:nord)
 
 IO.puts("Themes provide semantic colors for common UI purposes:\n")
 
@@ -81,92 +73,158 @@ colors = [
 
 for {semantic, desc} <- colors do
   label =
-    Esc.style()
-    |> Esc.theme_foreground(semantic)
+    Esc.style(theme)
+    |> Esc.foreground(semantic)
     |> Esc.bold()
     |> Esc.render(String.pad_trailing(":#{semantic}", 12))
 
   IO.puts("  #{label} - #{desc}")
 end
 
-Demo.section("Auto-Themed Components")
+Demo.section("Style with Theme")
 
-Esc.set_theme(:dracula)
-IO.puts("With Esc.set_theme(:dracula), components automatically use theme colors:\n")
+IO.puts("Pass theme to style() for clean, explicit theming:\n")
 
-IO.puts("Table (headers use :header, borders use :muted):")
-Table.new()
-|> Table.headers(["Feature", "Status", "Priority"])
-|> Table.row(["Theme support", "Complete", "High"])
-|> Table.row(["Auto-theming", "Complete", "High"])
-|> Table.row(["12 themes", "Complete", "Medium"])
-|> Table.border(:rounded)
-|> Table.render()
-|> IO.puts()
+IO.puts("  # No global state needed!")
+IO.puts("  Esc.style(:dracula)")
+IO.puts("  |> Esc.foreground(:error)")
+IO.puts("  |> Esc.render(\"Error message\")\n")
 
-IO.puts("\nTree (root uses :emphasis, connectors use :muted):")
-Tree.root("Project")
-|> Tree.child("lib")
-|> Tree.child("test")
-|> Tree.child("examples")
-|> Tree.render()
-|> IO.puts()
+dracula = Theme.Palette.get(:dracula)
 
-IO.puts("\nList (enumerators use :muted):")
-List.new(["First item", "Second item", "Third item"])
-|> List.enumerator(:arabic)
-|> List.render()
-|> IO.puts()
+error_msg =
+  Esc.style(dracula)
+  |> Esc.foreground(:error)
+  |> Esc.render("Error: Something went wrong")
 
-Demo.section("Disabling Theme for Specific Components")
+success_msg =
+  Esc.style(dracula)
+  |> Esc.foreground(:success)
+  |> Esc.render("Success: Operation completed")
 
-IO.puts("Use .use_theme(false) to disable auto-theming:\n")
+warning_msg =
+  Esc.style(dracula)
+  |> Esc.foreground(:warning)
+  |> Esc.render("Warning: Check your input")
 
-IO.puts("Without theme:")
-Table.new()
-|> Table.use_theme(false)
-|> Table.headers(["Column A", "Column B"])
-|> Table.row(["Value 1", "Value 2"])
-|> Table.border(:rounded)
-|> Table.render()
-|> IO.puts()
+IO.puts("  #{error_msg}")
+IO.puts("  #{success_msg}")
+IO.puts("  #{warning_msg}")
 
-IO.puts("\nWith theme:")
-Table.new()
-|> Table.headers(["Column A", "Column B"])
-|> Table.row(["Value 1", "Value 2"])
-|> Table.border(:rounded)
-|> Table.render()
-|> IO.puts()
+Demo.section("ANSI Color Names")
+
+IO.puts("Standard ANSI color names resolve through the theme:\n")
+
+nord = Theme.Palette.get(:nord)
+
+ansi_colors = [
+  :black,
+  :red,
+  :green,
+  :yellow,
+  :blue,
+  :magenta,
+  :cyan,
+  :white
+]
+
+IO.write("  ")
+
+for color <- ansi_colors do
+  styled =
+    Esc.style(nord)
+    |> Esc.foreground(color)
+    |> Esc.render(String.pad_trailing(to_string(color), 9))
+
+  IO.write(styled)
+end
+
+IO.puts("")
+IO.write("  ")
+
+for color <- ansi_colors do
+  bright = :"bright_#{color}"
+
+  styled =
+    Esc.style(nord)
+    |> Esc.foreground(bright)
+    |> Esc.render(String.pad_trailing(to_string(bright), 9))
+
+  IO.write(styled)
+end
+
+IO.puts("")
+
+Demo.section("Mixing Themes")
+
+IO.puts("Different elements can use different themes:\n")
+
+gruvbox = Theme.Palette.get(:gruvbox)
+
+nord_text =
+  Esc.style(nord)
+  |> Esc.foreground(:emphasis)
+  |> Esc.bold()
+  |> Esc.render("Nord theme")
+
+gruvbox_text =
+  Esc.style(gruvbox)
+  |> Esc.foreground(:emphasis)
+  |> Esc.bold()
+  |> Esc.render("Gruvbox theme")
+
+IO.puts("  #{nord_text}  vs  #{gruvbox_text}")
+
+Demo.section("Styled Box Example")
+
+IO.puts("Create themed UI elements with borders:\n")
+
+for theme_name <- [:nord, :dracula, :gruvbox] do
+  t = Theme.Palette.get(theme_name)
+
+  box =
+    Esc.style(t)
+    |> Esc.border(:rounded)
+    |> Esc.border_foreground(:muted)
+    |> Esc.padding(0, 2)
+    |> Esc.foreground(:header)
+    |> Esc.bold()
+    |> Esc.render(String.pad_trailing(to_string(theme_name), 10))
+
+  box
+  |> String.split("\n")
+  |> Enum.each(&IO.puts("  " <> &1))
+end
 
 Demo.section("Direct Theme Color Access")
 
-IO.puts("Access theme colors directly with Esc.theme_color/1:\n")
+IO.puts("Access theme colors with Esc.Theme.color/2:\n")
 
-Esc.set_theme(:nord)
-IO.puts("  Esc.theme_color(:error)   => #{inspect(Esc.theme_color(:error))}")
-IO.puts("  Esc.theme_color(:success) => #{inspect(Esc.theme_color(:success))}")
-IO.puts("  Esc.theme_color(:header)  => #{inspect(Esc.theme_color(:header))}")
+IO.puts("  Theme.color(nord, :error)   => #{inspect(Theme.color(nord, :error))}")
+IO.puts("  Theme.color(nord, :success) => #{inspect(Theme.color(nord, :success))}")
+IO.puts("  Theme.color(nord, :red)     => #{inspect(Theme.color(nord, :red))}")
 
 Demo.section("All 12 Themes")
 
 IO.puts("Quick preview of all available themes:\n")
 
-for theme <- Esc.themes() do
-  Esc.set_theme(theme)
-  t = Esc.get_theme()
+for theme_name <- Esc.themes() do
+  theme = Theme.Palette.get(theme_name)
 
-  name = String.pad_trailing("#{theme}", 12)
+  name = String.pad_trailing("#{theme_name}", 12)
+
   sample =
-    Esc.style()
-    |> Esc.foreground(t.foreground)
-    |> Esc.background(t.background)
+    Esc.style(theme)
+    |> Esc.foreground(:foreground)
+    |> Esc.background(:background)
     |> Esc.render(" #{name} ")
 
-  colors = for i <- 0..7 do
-    color = Map.get(t, :"ansi_#{i}")
-    Esc.style() |> Esc.foreground(color) |> Esc.render("●")
-  end
+  colors =
+    for i <- 0..7 do
+      Esc.style(theme)
+      |> Esc.foreground(:"ansi_#{i}")
+      |> Esc.render("*")
+    end
 
   IO.puts("  #{sample}  #{Enum.join(colors, " ")}")
 end

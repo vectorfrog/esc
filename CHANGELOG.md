@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-01-15
+
+### Added
+
+- **Semantic color ANSI fallback**: Semantic colors now work without themes
+  - When no theme is set, semantic colors automatically fall back to standard ANSI colors
+  - `:error` → `:red`
+  - `:success` → `:green`
+  - `:warning` → `:yellow`
+  - `:header` → `:cyan`
+  - `:emphasis` → `:blue`
+  - `:muted` → `:bright_black`
+  - Makes the API consistent - semantic colors work everywhere, with or without themes
+
 ## [0.9.0] - 2026-01-15
 
 ### Added
@@ -15,14 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New `style/1` function: `style(:nord)` creates a style with theme attached
   - Color atoms (`:red`, `:cyan`, `:bright_magenta`, etc.) resolve to theme RGB values
   - Works with all 16 ANSI colors: `:black`, `:red`, `:green`, `:yellow`, `:blue`, `:magenta`, `:cyan`, `:white`, and their `bright_*` variants
-  - Semantic colors (`:header`, `:emphasis`, `:warning`, `:error`, `:success`, `:muted`) work everywhere
-  - **Semantic color ANSI fallback**: When no theme is set, semantic colors automatically fall back to standard ANSI:
-    - `:error` → `:red`
-    - `:success` → `:green`
-    - `:warning` → `:yellow`
-    - `:header` → `:cyan`
-    - `:emphasis` → `:blue`
-    - `:muted` → `:bright_black`
+  - Semantic colors (`:header`, `:emphasis`, `:warning`, `:error`, `:success`, `:muted`) supported with themes
   - Demo script at `examples/theme_color_test.exs`
 
 ## [0.8.0] - 2026-01-03
